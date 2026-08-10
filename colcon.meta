@@ -1,0 +1,6 @@
+{
+  "names": {
+    "mower_bringup": { "cmake-args": ["-DBUILD_TESTING=ON"] },
+    "mower_control": { "cmake-args": ["-DBUILD_TESTING=ON"] }
+  }
+}

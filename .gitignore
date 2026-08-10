@@ -1,0 +1,13 @@
+# ROS 2 / colcon build products
+/build/
+/install/
+/log/
+
+# Editor and Dev Container local state
+.vscode/
+.devcontainer/.cache/
+
+# ROS bag recordings can be large and may contain field data.
+*.db3
+*.mcap
+*.bag

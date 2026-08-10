@@ -1,0 +1,23 @@
+{
+  "name": "ROS 2 Jazzy Mower",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "args": { "ROS_DISTRO": "jazzy" }
+  },
+  "workspaceFolder": "/workspaces/ros2_mower_ws",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspaces/ros2_mower_ws,type=bind"
+  ],
+  "remoteUser": "root",
+  "postCreateCommand": "rosdep update && rosdep install --from-paths src --ignore-src -r -y && colcon build --symlink-install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-iot.vscode-ros",
+        "ms-vscode.cpptools",
+        "ms-python.python"
+      ]
+    }
+  }
+}
