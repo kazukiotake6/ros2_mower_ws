@@ -1,0 +1,6 @@
+.git
+build
+install
+log
+.vscode
+.devcontainer/.cache
