@@ -1,19 +1,18 @@
-# ROS 2 mower workspace
+# ROS 2 芝刈りロボットワークスペース
 
-ROS 2 Jazzy development workspace for the autonomous mower described in
-[`develop_plan.md`](develop_plan.md). The workspace runs on both arm64 (Raspberry
-Pi 5) and x86_64 development machines; hardware interfaces are deliberately
-kept behind ROS 2 packages.
+[`develop_plan.md`](develop_plan.md) で定義した自律走行芝刈りロボット向けのROS 2 Jazzy 開発ワークスペースです。
+Raspberry Pi 5向けのarm64環境と、開発PC向けのx86_64環境の両方で動作します。
+ハードウェア依存の機能はROS 2パッケージの境界で分離します。
 
-## Quick start
+## 開始方法
 
-The recommended setup is the included Dev Container (Docker must be available):
+推奨環境は、同梱のDev Containerです（Dockerが必要です）。
 
-1. Open this repository in VS Code and choose **Reopen in Container**.
-2. The container resolves ROS dependencies and builds the workspace automatically.
-3. In a new terminal, source `install/setup.bash` before using ROS commands.
+1. VS Codeでこのリポジトリを開き、**Reopen in Container** を選択します。
+2. コンテナがROS依存関係を解決し、ワークスペースを自動ビルドします。
+3. ROSコマンドを使用する前に、新しいターミナルで `install/setup.bash` をsourceします。
 
-For a native Ubuntu 24.04 + ROS 2 Jazzy installation:
+Ubuntu 24.04とROS 2 Jazzyを使うネイティブ環境では、次を実行します。
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -25,26 +24,24 @@ colcon test
 colcon test-result --verbose
 ```
 
-## Package boundaries
+## パッケージの責務
 
-| Package | Responsibility |
+| パッケージ | 責務 |
 | --- | --- |
-| `mower_description` | Robot model, frames, and sensor placement |
-| `mower_bringup` | Launch/configuration and lifecycle orchestration |
-| `mower_camera` / `mower_imu` | CSI camera and BMI270 interfaces |
-| `mower_can` | SocketCAN-to-ROS gateway and CAN protocol validation |
-| `mower_control` | Velocity commands, watchdog behavior, and wheel control |
-| `mower_localization` | VIO, wheel odometry fusion, and localization |
-| `mower_navigation` | Coverage planning and navigation |
-| `mower_simulation` | Gazebo/vcan/HIL simulation support |
+| `mower_description` | ロボットモデル、座標フレーム、センサー搭載位置 |
+| `mower_bringup` | 起動・設定とライフサイクルの統合 |
+| `mower_camera` / `mower_imu` | CSIカメラおよびBMI270のインターフェース |
+| `mower_can` | SocketCAN-ROSゲートウェイとCANプロトコル検証 |
+| `mower_control` | 速度指令、ウォッチドッグ、車輪制御 |
+| `mower_localization` | VIO、車輪オドメトリ融合、自己位置推定 |
+| `mower_navigation` | カバレッジ計画とナビゲーション |
+| `mower_simulation` | Gazebo・仮想CAN・HILシミュレーション |
 
-Hardware drivers, CAN IDs, and safety-stop implementation are intentionally not
-provided by this scaffold: they require the reviewed electrical and MCU protocol
-specification described in the plan. Do not use this repository to bypass an
-MCU-controlled safety stop or an independent E-stop.
+ハードウェアドライバー、CAN ID、および安全停止の実装は、この雛形には含めません。
+これらには計画書で定めた、電気設計およびMCUプロトコル仕様のレビューが必要です。
+MCUが管理する安全停止機能や、独立したE-stopを迂回する用途には使用しないでください。
 
-## Quality checks
+## 品質確認
 
-`colcon build`, `colcon test`, and `colcon test-result --verbose` are the local
-quality gate and are also run in GitHub Actions. Build outputs and rosbag2 data
-are ignored by Git.
+ローカルの品質ゲートは `colcon build`、`colcon test`、`colcon test-result --verbose` です。
+これらはGitHub Actionsでも実行されます。ビルド生成物とrosbag2データはGitの管理対象外です。
