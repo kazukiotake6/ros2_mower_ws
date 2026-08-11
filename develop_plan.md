@@ -241,18 +241,18 @@ SPI0はBMI270と共有し、MCP2515はCE1、受信割込みはGPIO24を専用利
 | ビットタイミング | ビットレート、SJW、サンプルポイントをMCUと一致させる。初期候補は500 kbit/s。 |
 | INT信号 | MCP2515のアクティブLow割込み、GPIO24のプルアップ、極性を回路図と起動試験で確認する。 |
 | 物理層 | TJA1050の5 VロジックをPi/MCP2515の3.3 V領域へ直結しない。レベル変換または3.3 V対応品、共通GND、120 Ω終端、ESD/EMCを確認する。 |
-| CAN IDと周期 | ID、標準/拡張形式、送信周期、MCU側timeoutをプロトコルレビューで固定する。 |
+| CAN IDと周期 | ID、標準/拡張形式、Pi→MCUのmotion command／heartbeat送信周期10 ms、MCU側heartbeat監視timeout 50 ms以下をプロトコルレビューで固定する。50 msは5送信周期であり、最大並進速度0.55 m/sではtimeout中の移動距離が最大27.5 mmとなる。 |
 
 PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtoverlay=mcp2515-can1,oscillator=<確定値>,interrupt=24`とするが、実際のoverlay名・引数は対象カーネルの`/boot/firmware/overlays/README`で検証する。BMI270のCE0を無効化せず、`spidev0.1`との競合がないことをPi 5実機で確認する。
 
 ### 12.3 CANプロトコルと状態遷移
 
-実装前に`docs/can_protocol.md`を作成し、各フレームのID、方向、周期、DLC、バイト配置、符号、エンディアン、単位、スケール、予約ビット、CRC、連番、許容範囲、受信失敗時動作を固定する。破壊的変更はprotocol versionを上げ、Pi/MCUの版不一致ではREADYに遷移させない。IDはMCUとの合意前に実車へ送らない。
+実装前に`docs/can_protocol.md`を作成し、各フレームのID、方向、周期、DLC、バイト配置、符号、エンディアン、単位、スケール、予約ビット、CRC、連番、許容範囲、受信失敗時動作を固定する。暫定値はmotion command／heartbeatを10 ms（MCU実行周期と同期）、Pi側command timeoutを50 ms、MCU側heartbeat監視timeoutを50 ms以下とする。50 msの通信断検知時間に加え、MCU処理・駆動系応答・機械制動に要する距離を実機で測定し、安全要件を満たす値へ確定する。破壊的変更はprotocol versionを上げ、Pi/MCUの版不一致ではREADYに遷移させない。IDはMCUとの合意前に実車へ送らない。
 
 | 論理フレーム | 方向 | 内容・防御 |
 | --- | --- | --- |
 | `motion_command` | Pi → MCU | 線/角速度（または左右速度）、enable、停止要求、連番、有効期限。PiとMCUの双方で範囲、期限、状態を検査する。 |
-| `heartbeat` | Pi → MCU | protocol version、連番、Pi通信健全性。欠落時の停止時間はMCUが決定し、単独では再始動しない。 |
+| `heartbeat` | Pi → MCU | protocol version、連番、Pi通信健全性。MCUは50 ms以下の欠落で停止し、通信復旧だけでは再始動しない。 |
 | `mcu_status` | MCU → Pi | MCU状態、安全入力、E-stop、故障、通信監視、最終受理連番。Piの表示・上位停止に使うが安全判定を代替しない。 |
 | `wheel_odometry` | MCU → Pi | 左右エンコーダ、実速度、連番または時刻。単位、原点、ロールオーバーを明記する。 |
 | `power_thermal` | MCU → Pi | バッテリ、電流、温度。未実装値をゼロで偽装しない。 |
@@ -273,6 +273,8 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 | Publish | `/diagnostics` | bus-off、error frame、timeout、再接続、拒否指令数を出す。 |
 
 ### 12.5 実装・検証の段階
+
+実機CANベンチ試験への移行条件は、MCP2515の発振器・INT・ビットタイミング・物理層・終端抵抗の確認、`can0`起動、MCUとのID／フレーム／timeoutの合意、MCUの独立停止実装、および`vcan0`での正常・欠落・timeout・再接続試験の合格とする。この段階ではモータ・ブレードを無効にする。モータを有効にした低速統合は、MCU status decodeとPi側のstatus timeout／FAULT遷移を実装し、MCUの通信断時独立停止試験に合格した後に限る。
 
 1. **仕様・回路レビュー**：12.2の未確定値、停止状態、ID、バイト配置、timeoutを承認し、`docs/can_protocol.md`と配線チェックリストを作る。未承認なら実車指令を送らない。
 2. **SocketCAN基盤**：overlayと起動設定を導入する。`ip -details link show can0`、`candump`、`cansend`で認識、ビットレート、送受信、再起動後の復帰を確認する。
