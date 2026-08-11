@@ -5,7 +5,7 @@
     can_interface: can0
     motion_can_id: 512
     heartbeat_can_id: 513
-    command_period_ms: 20
-    command_timeout_ms: 100
+    command_period_ms: 10
+    command_timeout_ms: 50
     max_linear_mps: 0.3
     max_angular_radps: 0.8

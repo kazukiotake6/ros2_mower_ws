@@ -8,9 +8,17 @@
 | --- | ---: | --- |
 | motion command ID | `0x200` | `mcp2515.yaml`で変更可能 |
 | heartbeat ID | `0x201` | `mcp2515.yaml`で変更可能 |
-| 周期 | 20 ms | `command_period_ms` |
-| command timeout | 100 ms | `command_timeout_ms`、MCUは独立に同等以下のtimeoutを持つ |
+| 周期 | 10 ms | `command_period_ms`（MCUの実行周期に同期） |
+| command timeout | 50 ms | `command_timeout_ms`（5送信周期）。MCUは独立に同等以下のtimeoutを持つ |
 | protocol version | 1 | version不一致はREADYに遷移させない |
+
+### 周期・timeoutの選定根拠（暫定）
+
+motion commandとheartbeatは、MCUの10 ms実行周期に合わせて10 ms（100 Hz）で送信する。これにより、MCUは各実行周期で最新の指令または通信断を評価できる。
+
+通信timeoutは50 ms（送信周期5回分）とする。単発の送信周期ずれや1フレームの欠落では停止しにくくしつつ、通信断時は短時間で停止要求へ移行するためである。実機最大並進速度0.55 m/sでは、timeoutの間に進む距離は最大27.5 mm（`0.55 m/s × 0.050 s`）である。この距離に、MCUの処理時間、駆動系の応答時間および機械的な制動距離を加えた値が実際の通信断時停止距離となる。
+
+これらの値は暫定であり、CAN負荷、周期ジッタ、MCU側の監視実装、実機で測定した通信断時停止距離および安全要件を用いて確定する。MCU側のheartbeat監視timeoutは50 ms以下とし、通信復旧だけで走行を再開してはならない。
 
 ## Motion command（Pi → MCU、DLC=8）
 
@@ -23,7 +31,7 @@
 | 6 | protocol version | `uint8`、値1 |
 | 7 | reserved | 0 |
 
-Piはenableがfalse、`/cmd_vel`が未受信、または100 msを超えて期限切れのとき、stopフラグと両速度ゼロを送る。MCUはこの挙動に依存せず、期限・連番・DLC・version・値域・安全状態を検査して停止する。MCUは通信復旧だけで走行を再開してはならない。
+Piはenableがfalse、`/cmd_vel`が未受信、または50 msを超えて期限切れのとき、stopフラグと両速度ゼロを送る。MCUはこの挙動に依存せず、期限・連番・DLC・version・値域・安全状態を検査して停止する。MCUは通信復旧だけで走行を再開してはならない。
 
 ## Heartbeat（Pi → MCU、DLC=2）
 

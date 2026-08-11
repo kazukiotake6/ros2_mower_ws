@@ -34,8 +34,8 @@ public:
     interface_ = declare_parameter<std::string>("can_interface", "can0");
     motion_id_ = declare_parameter<int>("motion_can_id", 0x200);
     heartbeat_id_ = declare_parameter<int>("heartbeat_can_id", 0x201);
-    command_period_ms_ = declare_parameter<int>("command_period_ms", 20);
-    command_timeout_ms_ = declare_parameter<int>("command_timeout_ms", 100);
+    command_period_ms_ = declare_parameter<int>("command_period_ms", 10);
+    command_timeout_ms_ = declare_parameter<int>("command_timeout_ms", 50);
     max_linear_mps_ = declare_parameter<double>("max_linear_mps", 0.3);
     max_angular_radps_ = declare_parameter<double>("max_angular_radps", 0.8);
   }
