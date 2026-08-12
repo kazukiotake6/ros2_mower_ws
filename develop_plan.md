@@ -254,3 +254,52 @@ BMI270はリセット後に公式の8 KiB設定ファイルをロードし、初
 - フェーズ2：FIFO、INT1（GPIO25）割込み、SENSORTIME、Pi時刻対応、`/diagnostics`。
 - フェーズ3：静止・六面・Allan分散・Camera-IMU較正、カメラ同期計測。
 - フェーズ4：加速度計セルフテスト、異常処理、HIL、VIO統合と実走試験。
+
+## 13. libcamera実装の再開手順（2026-08-13時点）
+
+### 13.1 現在の作業状態
+
+- 作業ブランチは `feat/camera-libcamera`。
+- `mower_camera` に `libcamera_node` を追加済み。MIPI CSIカメラをlibcameraで取得し、`/image_raw`（`sensor_msgs/Image`）、`/camera_info`、`/diagnostics`を配信する。
+- `width`、`height`、`frame_rate`、`pixel_format`、`frame_id`、`camera_id`、`camera_info_url`、`exposure_time_us`、`analogue_gain`をROSパラメータ化済みである。`frame_rate`はFrameDurationLimits、固定露光・ゲインはlibcamera ControlListへ反映する。
+- YUYV、RGB888、BGR888、R8/MONO8をサポートし、既定プロファイルはOV9281向けの1280x800・60 Hz・YUYVとする。
+- `libcamera.launch.py` と既定YAMLを追加済み。`colcon build --packages-select mower_camera`とパラメータ検証のユニットテストは成功している。
+
+### 13.2 実装上の重要な未完了事項
+
+ホスト側実装とOV9281での基本配信は検証済みである。画像ヘッダの時刻は、libcameraの単調クロックをROS時刻として誤用しないため、現状はPublish時のROSクロックを用いる。Camera-IMU同期評価の前に、ハードウェアのフレーム開始時刻との対応付けを実装・実測する必要がある。
+
+次回は以下をこの順で実施する。
+
+1. Raspberry Pi 5でlibcameraのカメラ検出と`ros2 launch mower_camera libcamera.launch.py`による起動を確認する。
+2. `/image_raw`と`/camera_info`の解像度、エンコーディング、フレームレート、連続配信を確認し、OV9281とIMX296で対応フォーマットを記録する。
+3. `camera_info_url`に較正YAMLを指定し、チェッカーボードで内部パラメータと歪み補正を検証する。
+4. 固定露光・ゲイン、逆光、振動、汚れ、フレーム欠落を試験して、診断とrosbag2記録を確認する。
+5. フレーム開始・BMI270 IRQ・画像Publish時刻をロジアナで同時計測し、Camera-IMUのオフセットとジッタを記録する。
+6. 実機結果を反映してコミットとPRを作成する。
+
+### 13.3 後続フェーズ
+
+- フェーズ2：フレーム開始のハードウェア時刻対応、BMI270との時刻同期、フレーム欠落・キュー遅延診断。
+- フェーズ3：OV9281／IMX296のVIO比較、Camera-IMU外部パラメータ較正、rosbag再生試験。
+- フェーズ4：芝生・日照・振動・防水窓汚れを含む実走評価と、推定品質低下時の上位停止要求統合。
+
+### 13.4 実機CSI起動検証（2026-08-12）
+
+Raspberry Pi 5・Ubuntu 24.04 arm64で`ros2 run mower_camera libcamera_node`を実行した。libcamera 0.2.0は起動したが、カメラは列挙されず、ノードは`no libcamera camera found`で安全に終了した。このため、`/image_raw`、`/camera_info`、`/diagnostics`の実機配信は未達である。
+
+初回検証時点では、`/dev/media0`から`/dev/media2`および`/dev/video19`から`/dev/video37`は存在し、`/boot/firmware/config.txt`には`camera_auto_detect=1`が設定されていた。一方で`libcamera-ipa`は未導入であり、`No IPA found in '/usr/lib/aarch64-linux-gnu/libcamera'`を確認した。IPA導入後の再検証結果は13.5を参照する。詳細な仕様と手順は`docs/camera_libcamera.md`を参照する。
+
+### 13.5 IPA導入後の再検証（2026-08-12）
+
+`libcamera-ipa` 0.2.0-3fakesync1build6 の導入を確認後、`libcamera_node`を再起動した。IPAモジュール（`ipa_rpi_vc4.so`を含む）は`/usr/lib/aarch64-linux-gnu/libcamera`に存在し、初回に出ていたIPA警告は解消された。しかしlibcameraの列挙カメラ数は依然0台であり、`/image_raw`、`/camera_info`、`/diagnostics`は配信されなかった。
+
+カーネル側にはCSI受信機、OV9281、IMX296に対応するvideo/mediaデバイスおよびログが見つからなかった。存在する`video19`から`video37`はPiSPおよびrpivid用であり、CSIセンサーの認識を示さない。次の実施には、電源断状態でのCSIケーブル・コネクタ確認と、使用センサーに対応するdevice-tree overlayの適用が必要である。
+
+### 13.6 PiSP対応libcamera導入後の実機配信検証（2026-08-13）
+
+Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281を列挙できなかったため、Raspberry Pi版libcamera `v0.7.1+rpt20260429`を`/usr/local`へ導入した。`ipa_rpi_pisp.so`の存在を確認し、`cam -l`は`/base/axi/pcie@120000/rp1/i2c@88000/ov9281@60`のOV9281を1台列挙した。カーネルログでもI2Cアドレス`10-0060`のOV9281とCSI受信器`/dev/video0`を確認した。
+
+`mower_camera`をlibcamera 0.7.1へクリーン再ビルド後、`ros2 launch mower_camera libcamera.launch.py`で起動した。`/image_raw`、`/camera_info`、`/diagnostics`が作成され、`/image_raw`は1280x800、`yuv422_yuy2`、`camera_optical_frame`で配信された。12秒測定の実効レートは`/image_raw`が59.70から60.11 Hz、`/camera_info`が59.96から60.00 Hzであり、60 Hz配信要件を満たした。
+
+`camera_info_url`は未指定のため、CameraInfoの歪みモデルと内部パラメータは未較正である。IMX296の実機確認、較正、固定露光・ゲイン、フレーム欠落、Camera-IMU時刻同期は後続フェーズで実施する。

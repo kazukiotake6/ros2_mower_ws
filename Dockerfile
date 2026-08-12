@@ -11,11 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential \
       can-utils \
       git \
+      libcamera-dev \
+      libcamera-ipa \
       python3-colcon-common-extensions \
       python3-rosdep \
       python3-vcstool \
       ros-${ROS_DISTRO}-ament-lint-auto \
       ros-${ROS_DISTRO}-ament-cmake-gtest \
+      ros-${ROS_DISTRO}-camera-info-manager \
     && rm -rf /var/lib/apt/lists/*
 
 RUN rosdep init 2>/dev/null || true
