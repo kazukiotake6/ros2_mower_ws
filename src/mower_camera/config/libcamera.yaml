@@ -1,0 +1,12 @@
+libcamera_node:
+  ros__parameters:
+    width: 1280
+    height: 800
+    frame_rate: 60.0
+    pixel_format: YUYV
+    frame_id: camera_optical_frame
+    camera_id: ''
+    camera_info_url: ''
+    # 0 uses libcamera auto-exposure and auto-gain.
+    exposure_time_us: 0
+    analogue_gain: 0.0

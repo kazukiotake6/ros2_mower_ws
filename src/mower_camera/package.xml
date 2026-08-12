@@ -2,9 +2,19 @@
 <package format="3">
   <name>mower_camera</name>
   <version>0.1.0</version>
-  <description>CSI camera acquisition and CameraInfo publishing interfaces.</description>
+  <description>libcamera CSI camera acquisition, CameraInfo publishing, and diagnostics.</description>
   <maintainer email="maintainers@example.com">Mower maintainers</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>pkg-config</build_depend>
+  <build_export_depend>pkg-config</build_export_depend>
+  <depend>camera_info_manager</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>
