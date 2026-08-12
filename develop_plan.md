@@ -222,3 +222,35 @@ BMI270とMCP2515はSPI0を共有し、CSと割込み線を専用化する。カ�
 - ベンチ試験で静止時の重力方向、ジャイロバイアス、実効ODR、温度変化、振動耐性を測定する。
 - HIL試験でSPI断、FIFO過負荷、IRQ途絶、セルフテスト失敗、Pi再起動を模擬し、診断・復旧・安全系分離を確認する。
 - VIO統合試験で、IMUなし、未較正、較正済み、時刻補正済みの追跡損失、姿勢ドリフト、再現性を比較する。
+
+
+## 12. BMI270実装の再開手順（2026-08-10時点）
+
+### 12.1 現在の作業状態
+
+- 作業ブランチは `feat/bmi270-raw-data`。変更は未コミットである。
+- `mower_imu` に `bmi270_raw_node` を追加済み。SPI0/CE0（既定 `/dev/spidev0.0`）を開き、チップID確認、直接レジスタ設定、加速度・ジャイロのポーリング取得、`/imu/data_raw` へのSI単位Publishを実装している。
+- `spi_device`、`spi_speed_hz`、`accel_range_g`、`gyro_range_dps`、`poll_rate_hz`、`frame_id` はROSパラメータ化済みである。
+- `colcon build --packages-select mower_imu` は成功している。
+- Bosch公式BMI270 Sensor API（BSD-3-Clause）は `src/mower_imu/third_party/bmi270/` に取り込み済みで、ライセンスファイルも保持している。
+- CMakeには公式APIのビルド対象追加を開始しているが、ノードはまだ公式APIを呼び出していない。
+
+### 12.2 実装上の重要な未完了事項
+
+BMI270はリセット後に公式の8 KiB設定ファイルをロードし、初期化成功を確認しなければならない。現行ノードの直接レジスタ初期化だけでは実機データ取得を保証できないため、フェーズ1は未完了として扱う。
+
+次回は以下をこの順で実施する。
+
+1. `bmi270_raw_node` にSPI read/write/delayコールバックを実装する。書込みコールバックは設定ファイルの連続バースト書込みに対応させる。
+2. `bmi2_dev` をSPIインターフェースとして設定し、`bmi270_init()` を呼び出す。戻り値と初期化状態を検査して失敗時はPublishしない。
+3. 公式API経由で加速度・ジャイロのODR、レンジ、フィルタを設定し、有効化する。
+4. 公式API経由で加速度・ジャイロのサンプルを取得し、既存の`/imu/data_raw` Publishへ接続する。
+5. `colcon build --packages-select mower_imu` を実行し、警告なしでビルドできることを確認する。
+6. 実機でチップID、重力方向、200 Hz取得、SPI通信断からの復帰を確認する。
+7. 実機確認後にコミットとPRを作成する。
+
+### 12.3 後続フェーズ
+
+- フェーズ2：FIFO、INT1（GPIO25）割込み、SENSORTIME、Pi時刻対応、`/diagnostics`。
+- フェーズ3：静止・六面・Allan分散・Camera-IMU較正、カメラ同期計測。
+- フェーズ4：加速度計セルフテスト、異常処理、HIL、VIO統合と実走試験。
