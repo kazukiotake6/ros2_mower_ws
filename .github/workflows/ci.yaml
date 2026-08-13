@@ -15,7 +15,7 @@ jobs:
         shell: bash
         run: |
           apt-get update
-          apt-get install -y python3-colcon-common-extensions python3-rosdep ros-jazzy-ament-lint-auto ros-jazzy-ament-cmake-gtest
+          apt-get install -y libcamera-dev python3-colcon-common-extensions python3-rosdep ros-jazzy-ament-lint-auto ros-jazzy-ament-cmake-gtest
           rosdep init || true
           rosdep update
           rosdep install --from-paths src --ignore-src -r -y

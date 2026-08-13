@@ -223,15 +223,95 @@ BMI270とMCP2515はSPI0を共有し、CSと割込み線を専用化する。カ�
 - HIL試験でSPI断、FIFO過負荷、IRQ途絶、セルフテスト失敗、Pi再起動を模擬し、診断・復旧・安全系分離を確認する。
 - VIO統合試験で、IMUなし、未較正、較正済み、時刻補正済みの追跡損失、姿勢ドリフト、再現性を比較する。
 
-## 12. MCP2515 CAN通信の設計・実装計画
 
-### 12.1 目的と安全境界
+## 12. BMI270実装の再開手順（2026-08-10時点）
+
+### 12.1 現在の作業状態
+
+- 作業ブランチは `feat/bmi270-raw-data`。変更は未コミットである。
+- `mower_imu` に `bmi270_raw_node` を追加済み。SPI0/CE0（既定 `/dev/spidev0.0`）を開き、チップID確認、直接レジスタ設定、加速度・ジャイロのポーリング取得、`/imu/data_raw` へのSI単位Publishを実装している。
+- `spi_device`、`spi_speed_hz`、`accel_range_g`、`gyro_range_dps`、`poll_rate_hz`、`frame_id` はROSパラメータ化済みである。
+- `colcon build --packages-select mower_imu` は成功している。
+- Bosch公式BMI270 Sensor API（BSD-3-Clause）は `src/mower_imu/third_party/bmi270/` に取り込み済みで、ライセンスファイルも保持している。
+- CMakeには公式APIのビルド対象追加を開始しているが、ノードはまだ公式APIを呼び出していない。
+
+### 12.2 実装上の重要な未完了事項
+
+BMI270はリセット後に公式の8 KiB設定ファイルをロードし、初期化成功を確認しなければならない。現行ノードの直接レジスタ初期化だけでは実機データ取得を保証できないため、フェーズ1は未完了として扱う。
+
+次回は以下をこの順で実施する。
+
+1. `bmi270_raw_node` にSPI read/write/delayコールバックを実装する。書込みコールバックは設定ファイルの連続バースト書込みに対応させる。
+2. `bmi2_dev` をSPIインターフェースとして設定し、`bmi270_init()` を呼び出す。戻り値と初期化状態を検査して失敗時はPublishしない。
+3. 公式API経由で加速度・ジャイロのODR、レンジ、フィルタを設定し、有効化する。
+4. 公式API経由で加速度・ジャイロのサンプルを取得し、既存の`/imu/data_raw` Publishへ接続する。
+5. `colcon build --packages-select mower_imu` を実行し、警告なしでビルドできることを確認する。
+6. 実機でチップID、重力方向、200 Hz取得、SPI通信断からの復帰を確認する。
+7. 実機確認後にコミットとPRを作成する。
+
+### 12.3 後続フェーズ
+
+- フェーズ2：FIFO、INT1（GPIO25）割込み、SENSORTIME、Pi時刻対応、`/diagnostics`。
+- フェーズ3：静止・六面・Allan分散・Camera-IMU較正、カメラ同期計測。
+- フェーズ4：加速度計セルフテスト、異常処理、HIL、VIO統合と実走試験。
+
+## 13. libcamera実装の再開手順（2026-08-13時点）
+
+### 13.1 現在の作業状態
+
+- 作業ブランチは `feat/camera-libcamera`。
+- `mower_camera` に `libcamera_node` を追加済み。MIPI CSIカメラをlibcameraで取得し、`/image_raw`（`sensor_msgs/Image`）、`/camera_info`、`/diagnostics`を配信する。
+- `width`、`height`、`frame_rate`、`pixel_format`、`frame_id`、`camera_id`、`camera_info_url`、`exposure_time_us`、`analogue_gain`をROSパラメータ化済みである。`frame_rate`はFrameDurationLimits、固定露光・ゲインはlibcamera ControlListへ反映する。
+- YUYV、RGB888、BGR888、R8/MONO8をサポートし、既定プロファイルはOV9281向けの1280x800・60 Hz・YUYVとする。
+- `libcamera.launch.py` と既定YAMLを追加済み。`colcon build --packages-select mower_camera`とパラメータ検証のユニットテストは成功している。
+
+### 13.2 実装上の重要な未完了事項
+
+ホスト側実装とOV9281での基本配信は検証済みである。画像ヘッダの時刻は、libcameraの単調クロックをROS時刻として誤用しないため、現状はPublish時のROSクロックを用いる。Camera-IMU同期評価の前に、ハードウェアのフレーム開始時刻との対応付けを実装・実測する必要がある。
+
+次回は以下をこの順で実施する。
+
+1. Raspberry Pi 5でlibcameraのカメラ検出と`ros2 launch mower_camera libcamera.launch.py`による起動を確認する。
+2. `/image_raw`と`/camera_info`の解像度、エンコーディング、フレームレート、連続配信を確認し、OV9281とIMX296で対応フォーマットを記録する。
+3. `camera_info_url`に較正YAMLを指定し、チェッカーボードで内部パラメータと歪み補正を検証する。
+4. 固定露光・ゲイン、逆光、振動、汚れ、フレーム欠落を試験して、診断とrosbag2記録を確認する。
+5. フレーム開始・BMI270 IRQ・画像Publish時刻をロジアナで同時計測し、Camera-IMUのオフセットとジッタを記録する。
+6. 実機結果を反映してコミットとPRを作成する。
+
+### 13.3 後続フェーズ
+
+- フェーズ2：フレーム開始のハードウェア時刻対応、BMI270との時刻同期、フレーム欠落・キュー遅延診断。
+- フェーズ3：OV9281／IMX296のVIO比較、Camera-IMU外部パラメータ較正、rosbag再生試験。
+- フェーズ4：芝生・日照・振動・防水窓汚れを含む実走評価と、推定品質低下時の上位停止要求統合。
+
+### 13.4 実機CSI起動検証（2026-08-12）
+
+Raspberry Pi 5・Ubuntu 24.04 arm64で`ros2 run mower_camera libcamera_node`を実行した。libcamera 0.2.0は起動したが、カメラは列挙されず、ノードは`no libcamera camera found`で安全に終了した。このため、`/image_raw`、`/camera_info`、`/diagnostics`の実機配信は未達である。
+
+初回検証時点では、`/dev/media0`から`/dev/media2`および`/dev/video19`から`/dev/video37`は存在し、`/boot/firmware/config.txt`には`camera_auto_detect=1`が設定されていた。一方で`libcamera-ipa`は未導入であり、`No IPA found in '/usr/lib/aarch64-linux-gnu/libcamera'`を確認した。IPA導入後の再検証結果は13.5を参照する。詳細な仕様と手順は`docs/camera_libcamera.md`を参照する。
+
+### 13.5 IPA導入後の再検証（2026-08-12）
+
+`libcamera-ipa` 0.2.0-3fakesync1build6 の導入を確認後、`libcamera_node`を再起動した。IPAモジュール（`ipa_rpi_vc4.so`を含む）は`/usr/lib/aarch64-linux-gnu/libcamera`に存在し、初回に出ていたIPA警告は解消された。しかしlibcameraの列挙カメラ数は依然0台であり、`/image_raw`、`/camera_info`、`/diagnostics`は配信されなかった。
+
+カーネル側にはCSI受信機、OV9281、IMX296に対応するvideo/mediaデバイスおよびログが見つからなかった。存在する`video19`から`video37`はPiSPおよびrpivid用であり、CSIセンサーの認識を示さない。次の実施には、電源断状態でのCSIケーブル・コネクタ確認と、使用センサーに対応するdevice-tree overlayの適用が必要である。
+
+### 13.6 PiSP対応libcamera導入後の実機配信検証（2026-08-13）
+
+Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281を列挙できなかったため、Raspberry Pi版libcamera `v0.7.1+rpt20260429`を`/usr/local`へ導入した。`ipa_rpi_pisp.so`の存在を確認し、`cam -l`は`/base/axi/pcie@120000/rp1/i2c@88000/ov9281@60`のOV9281を1台列挙した。カーネルログでもI2Cアドレス`10-0060`のOV9281とCSI受信器`/dev/video0`を確認した。
+
+`mower_camera`をlibcamera 0.7.1へクリーン再ビルド後、`ros2 launch mower_camera libcamera.launch.py`で起動した。`/image_raw`、`/camera_info`、`/diagnostics`が作成され、`/image_raw`は1280x800、`yuv422_yuy2`、`camera_optical_frame`で配信された。12秒測定の実効レートは`/image_raw`が59.70から60.11 Hz、`/camera_info`が59.96から60.00 Hzであり、60 Hz配信要件を満たした。
+
+`camera_info_url`は未指定のため、CameraInfoの歪みモデルと内部パラメータは未較正である。IMX296の実機確認、較正、固定露光・ゲイン、フレーム欠落、Camera-IMU時刻同期は後続フェーズで実施する。
+## 14. MCP2515 CAN通信の設計・実装計画
+
+### 14.1 目的と安全境界
 
 `mower_can` は、Pi接続のMCP2515をLinuxの`mcp251x`ドライバとSocketCANで`can0`として使用し、CAN 2.0BとROS 2の指令・状態を相互変換する。アプリケーションからMCP2515をSPIで直接制御しないため、実機CAN、`vcan0`、HILで同一のゲートウェイを検証できる。
 
 これは非安全系の通信アダプタである。MCUはCAN指令の喪失、期限切れ、連番異常、値域外または安全状態不成立時に、Piを介さずゼロ速度・ブレード停止へ遷移する。独立E-stop、MCUウォッチドッグ、安全入力を迂回してはならない。フェーズ1の完了条件は、`can0`の安定起動、`vcan0`/実CANでの送受信と再接続、期限・範囲・状態による指令拒否、異常の`/diagnostics`観測とする。実走はMCUのフェイルセーフ試験合格後まで開始しない。
 
-### 12.2 ハードウェア・SocketCAN設計
+### 14.2 ハードウェア・SocketCAN設計
 
 SPI0はBMI270と共有し、MCP2515はCE1、受信割込みはGPIO24を専用利用する（11.2節）。実装前に次の値を`config/mcp2515.yaml`とハードウェア台帳に記録し、回路・MCU担当とレビューする。
 
@@ -245,7 +325,7 @@ SPI0はBMI270と共有し、MCP2515はCE1、受信割込みはGPIO24を専用利
 
 PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtoverlay=mcp2515-can1,oscillator=<確定値>,interrupt=24`とするが、実際のoverlay名・引数は対象カーネルの`/boot/firmware/overlays/README`で検証する。BMI270のCE0を無効化せず、`spidev0.1`との競合がないことをPi 5実機で確認する。
 
-### 12.3 CANプロトコルと状態遷移
+### 14.3 CANプロトコルと状態遷移
 
 実装前に`docs/can_protocol.md`を作成し、各フレームのID、方向、周期、DLC、バイト配置、符号、エンディアン、単位、スケール、予約ビット、CRC、連番、許容範囲、受信失敗時動作を固定する。暫定値はmotion command／heartbeatを10 ms（MCU実行周期と同期）、Pi側command timeoutを50 ms、MCU側heartbeat監視timeoutを50 ms以下とする。50 msの通信断検知時間に加え、MCU処理・駆動系応答・機械制動に要する距離を実機で測定し、安全要件を満たす値へ確定する。破壊的変更はprotocol versionを上げ、Pi/MCUの版不一致ではREADYに遷移させない。IDはMCUとの合意前に実車へ送らない。
 
@@ -259,7 +339,7 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 
 状態は`DOWN → CONFIGURING → WAITING_FOR_MCU → READY → FAULT`とする。READYにはinterface UP、version一致、連続した正常status、MCUの安全許可、上位の明示enableを必要とする。bus-off、送信失敗継続、status timeout、version不一致、MCU fault、E-stopはFAULTとし、Piはゼロ速度・disableの送信を試みた後に通常指令を止める。復帰にはMCUの安全復帰条件と明示enableを改めて必要とする。
 
-### 12.4 ROS 2構成
+### 14.4 ROS 2構成
 
 `mower_can`にC++/`rclcpp` lifecycle node `can_gateway_node`を実装する。CAN RAW socketを非同期受信し、送信周期はROS timer、timeoutは単調クロックで評価する。interface/ソケット障害には指数バックオフで再接続し、`can_interface`は既定`can0`、試験時`vcan0`とする。
 
@@ -272,7 +352,7 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 | Publish | `/mower/mcu_status`、`/mower/can_link_status` | `mower_can`のrosidl messageとして、安全状態、故障、通信統計を表す。 |
 | Publish | `/diagnostics` | bus-off、error frame、timeout、再接続、拒否指令数を出す。 |
 
-### 12.5 実装・検証の段階
+### 14.5 実装・検証の段階
 
 実機CANベンチ試験への移行条件は、MCP2515の発振器・INT・ビットタイミング・物理層・終端抵抗の確認、`can0`起動、MCUとのID／フレーム／timeoutの合意、MCUの独立停止実装、および`vcan0`での正常・欠落・timeout・再接続試験の合格とする。この段階ではモータ・ブレードを無効にする。モータを有効にした低速統合は、MCU status decodeとPi側のstatus timeout／FAULT遷移を実装し、MCUの通信断時独立停止試験に合格した後に限る。
 
