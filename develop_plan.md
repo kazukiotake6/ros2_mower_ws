@@ -303,3 +303,66 @@ Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281
 `mower_camera`をlibcamera 0.7.1へクリーン再ビルド後、`ros2 launch mower_camera libcamera.launch.py`で起動した。`/image_raw`、`/camera_info`、`/diagnostics`が作成され、`/image_raw`は1280x800、`yuv422_yuy2`、`camera_optical_frame`で配信された。12秒測定の実効レートは`/image_raw`が59.70から60.11 Hz、`/camera_info`が59.96から60.00 Hzであり、60 Hz配信要件を満たした。
 
 `camera_info_url`は未指定のため、CameraInfoの歪みモデルと内部パラメータは未較正である。IMX296の実機確認、較正、固定露光・ゲイン、フレーム欠落、Camera-IMU時刻同期は後続フェーズで実施する。
+## 14. MCP2515 CAN通信の設計・実装計画
+
+### 14.1 目的と安全境界
+
+`mower_can` は、Pi接続のMCP2515をLinuxの`mcp251x`ドライバとSocketCANで`can0`として使用し、CAN 2.0BとROS 2の指令・状態を相互変換する。アプリケーションからMCP2515をSPIで直接制御しないため、実機CAN、`vcan0`、HILで同一のゲートウェイを検証できる。
+
+これは非安全系の通信アダプタである。MCUはCAN指令の喪失、期限切れ、連番異常、値域外または安全状態不成立時に、Piを介さずゼロ速度・ブレード停止へ遷移する。独立E-stop、MCUウォッチドッグ、安全入力を迂回してはならない。フェーズ1の完了条件は、`can0`の安定起動、`vcan0`/実CANでの送受信と再接続、期限・範囲・状態による指令拒否、異常の`/diagnostics`観測とする。実走はMCUのフェイルセーフ試験合格後まで開始しない。
+
+### 14.2 ハードウェア・SocketCAN設計
+
+SPI0はBMI270と共有し、MCP2515はCE1、受信割込みはGPIO24を専用利用する（11.2節）。実装前に次の値を`config/mcp2515.yaml`とハードウェア台帳に記録し、回路・MCU担当とレビューする。
+
+| 項目 | 確定・確認内容 |
+| --- | --- |
+| 発振器周波数 | モジュール仕様と実装部品で確認する。8/16 MHzを推測で設定しない。 |
+| ビットタイミング | ビットレート、SJW、サンプルポイントをMCUと一致させる。初期候補は500 kbit/s。 |
+| INT信号 | MCP2515のアクティブLow割込み、GPIO24のプルアップ、極性を回路図と起動試験で確認する。 |
+| 物理層 | TJA1050の5 VロジックをPi/MCP2515の3.3 V領域へ直結しない。レベル変換または3.3 V対応品、共通GND、120 Ω終端、ESD/EMCを確認する。 |
+| CAN IDと周期 | ID、標準/拡張形式、Pi→MCUのmotion command／heartbeat送信周期10 ms、MCU側heartbeat監視timeout 50 ms以下をプロトコルレビューで固定する。50 msは5送信周期であり、最大並進速度0.55 m/sではtimeout中の移動距離が最大27.5 mmとなる。 |
+
+PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtoverlay=mcp2515-can1,oscillator=<確定値>,interrupt=24`とするが、実際のoverlay名・引数は対象カーネルの`/boot/firmware/overlays/README`で検証する。BMI270のCE0を無効化せず、`spidev0.1`との競合がないことをPi 5実機で確認する。
+
+### 14.3 CANプロトコルと状態遷移
+
+実装前に`docs/can_protocol.md`を作成し、各フレームのID、方向、周期、DLC、バイト配置、符号、エンディアン、単位、スケール、予約ビット、CRC、連番、許容範囲、受信失敗時動作を固定する。暫定値はmotion command／heartbeatを10 ms（MCU実行周期と同期）、Pi側command timeoutを50 ms、MCU側heartbeat監視timeoutを50 ms以下とする。50 msの通信断検知時間に加え、MCU処理・駆動系応答・機械制動に要する距離を実機で測定し、安全要件を満たす値へ確定する。破壊的変更はprotocol versionを上げ、Pi/MCUの版不一致ではREADYに遷移させない。IDはMCUとの合意前に実車へ送らない。
+
+| 論理フレーム | 方向 | 内容・防御 |
+| --- | --- | --- |
+| `motion_command` | Pi → MCU | 線/角速度（または左右速度）、enable、停止要求、連番、有効期限。PiとMCUの双方で範囲、期限、状態を検査する。 |
+| `heartbeat` | Pi → MCU | protocol version、連番、Pi通信健全性。MCUは50 ms以下の欠落で停止し、通信復旧だけでは再始動しない。 |
+| `mcu_status` | MCU → Pi | MCU状態、安全入力、E-stop、故障、通信監視、最終受理連番。Piの表示・上位停止に使うが安全判定を代替しない。 |
+| `wheel_odometry` | MCU → Pi | 左右エンコーダ、実速度、連番または時刻。単位、原点、ロールオーバーを明記する。 |
+| `power_thermal` | MCU → Pi | バッテリ、電流、温度。未実装値をゼロで偽装しない。 |
+
+状態は`DOWN → CONFIGURING → WAITING_FOR_MCU → READY → FAULT`とする。READYにはinterface UP、version一致、連続した正常status、MCUの安全許可、上位の明示enableを必要とする。bus-off、送信失敗継続、status timeout、version不一致、MCU fault、E-stopはFAULTとし、Piはゼロ速度・disableの送信を試みた後に通常指令を止める。復帰にはMCUの安全復帰条件と明示enableを改めて必要とする。
+
+### 14.4 ROS 2構成
+
+`mower_can`にC++/`rclcpp` lifecycle node `can_gateway_node`を実装する。CAN RAW socketを非同期受信し、送信周期はROS timer、timeoutは単調クロックで評価する。interface/ソケット障害には指数バックオフで再接続し、`can_interface`は既定`can0`、試験時`vcan0`とする。
+
+| 種別 | インターフェース | 方針 |
+| --- | --- | --- |
+| Subscribe | `/cmd_vel` (`geometry_msgs/TwistStamped`) | 受信時刻、frame_id、有限値、上限を検査し、期限切れは送信しない。 |
+| Subscribe | `/mower/enable` (`std_msgs/Bool`) | 明示許可要求のみ。安全保証・再始動の代替ではない。 |
+| Publish | `/wheel/odometry` (`nav_msgs/Odometry`) | MCU情報を正規化し、座標系・共分散・時刻の出所を仕様化する。 |
+| Publish | `/battery/state` (`sensor_msgs/BatteryState`) | 取得可能な値だけをSI単位で公開する。 |
+| Publish | `/mower/mcu_status`、`/mower/can_link_status` | `mower_can`のrosidl messageとして、安全状態、故障、通信統計を表す。 |
+| Publish | `/diagnostics` | bus-off、error frame、timeout、再接続、拒否指令数を出す。 |
+
+### 14.5 実装・検証の段階
+
+実機CANベンチ試験への移行条件は、MCP2515の発振器・INT・ビットタイミング・物理層・終端抵抗の確認、`can0`起動、MCUとのID／フレーム／timeoutの合意、MCUの独立停止実装、および`vcan0`での正常・欠落・timeout・再接続試験の合格とする。この段階ではモータ・ブレードを無効にする。モータを有効にした低速統合は、MCU status decodeとPi側のstatus timeout／FAULT遷移を実装し、MCUの通信断時独立停止試験に合格した後に限る。
+
+1. **仕様・回路レビュー**：12.2の未確定値、停止状態、ID、バイト配置、timeoutを承認し、`docs/can_protocol.md`と配線チェックリストを作る。未承認なら実車指令を送らない。
+2. **SocketCAN基盤**：overlayと起動設定を導入する。`ip -details link show can0`、`candump`、`cansend`で認識、ビットレート、送受信、再起動後の復帰を確認する。
+3. **codec**：CAN frameのencode/decode、DLC・範囲・連番・version検査を純粋関数として実装し、任意バイト列と未定義IDを安全に拒否する。
+4. **gateway**：lifecycle、socket、状態遷移、`cmd_vel` watchdog、ROS変換、diagnostics、再接続を実装する。inactive/error中はmotion commandを送らない。
+5. **仮想CAN/HIL**：`vcan0`とMCU simulatorで正常、欠落、期限切れ、状態遷移、再起動を自動試験した後、モータ・ブレード無効の実CANで負荷、bus-off、Pi/MCU再起動、SPI/INT断を試験する。
+6. **低速統合**：MCU停止試験後に低速・無負荷で指令、オドメトリ、通信断停止、復帰をログ化し、残存リスクを更新してから範囲を広げる。
+
+単体テストは全frame、境界値、符号/エンディアン、DLC不一致、未知ID、NaN/Inf、連番ロールオーバー、期限、状態遷移を対象とする。結合テストは`vcan0`で順序乱れ、欠落、再接続、topic変換、diagnosticsを確認する。実機では起動100回、連続通信、最大想定バス負荷、error counter、bus-off復旧を測定し、SPI共有時のBMI270とCANの要求レートも同時確認する。CAN_H/L断、終端不良、MCU/Pi停止、MCP2515電源断、SPI/INT断、異常ID/DLC、期限切れを故障注入し、MCUの独立停止とPiのFAULT/診断を確認する。
+
+成果物はprotocol仕様、配線・overlay手順、`mower_can`のcodec/gateway/message/launch/config、MCU simulator、単体・結合・HIL結果、CAN log、残存リスク一覧である。発振器、物理層、CAN ID、MCU timeoutはリポジトリだけでは確定できないため、承認済みの値で埋まるまで実装は`vcan0`とモータ無効ベンチ試験に限定する。
