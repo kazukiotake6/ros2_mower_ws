@@ -320,8 +320,14 @@ Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281
 | 実機 | 十分な連続運転でFPS、欠落、CPU・メモリ使用量、遅延の増加、停止・再起動を測定する。 | リソース使用量と遅延に継続的増加がなく、停止・再起動後も正常に再配信できる。測定時間と許容値は対象Piの負荷条件とともに事前に決める。 |
 | 実機 | 較正の再投影誤差、解像度変更後の較正無効化、Camera-IMUのオフセット・最大ジッタ・ドリフトを測定する。 | 較正YAMLの適用を確認し、合意済みの精度閾値を満たす。満たさない場合はVIO投入を禁止して原因と対策を記録する。 |
 | HIL/統合 | カメラケーブル断、センサー電源断、libcamera再起動、低FPS化、フレーム停止を注入し、VIOと上位停止要求を確認する。 | カメラ障害を正常画像として扱わず、診断と上位通知を行う。外部MCUの独立安全機能に影響を与えない。 |
-## 14. MCP2515 CAN通信の設計・実装計画
+### 13.8 実機再検証の再開記録（2026-08-15）
 
+- 作業ブランチは `feat/camera-ros-publisher-hardening`、worktreeは `.worktrees/camera-ros-publisher`。画像・CameraInfo配信実装は `189bb8b`。
+- Pi 5カーネルはOV9281（`10-0060`）とCSI `/dev/video0` を認識しているが、ROS Jazzyのlibcamera 0.7.1は `RPI pisp.cpp: Unable to acquire a CFE instance` によりカメラ0台となる。ROSノードも `no libcamera camera found` で終了し、画像・CameraInfoは未配信。
+- 再起動後は `sudo apt-get update && sudo apt-get upgrade` 後に、`uname -r`、`dpkg-query -W linux-image-raspi linux-firmware-raspi libcamera0.2 libcamera-ipa ros-jazzy-libcamera`、`cam -l` を実行する。OV9281が列挙されなければ `LIBCAMERA_LOG_LEVELS='*:DEBUG' cam -l` のログを保存し、ROS試験へ進まない。
+- 列挙された場合はworktreeで `source /opt/ros/jazzy/setup.bash && colcon build --packages-select mower_camera && source install/setup.bash` を実行し、`ros2 launch mower_camera libcamera.launch.py` と、別端末の `ros2 topic hz /image_raw`、`ros2 topic echo --once /camera_info`、`ros2 topic echo --once /diagnostics` を確認する。合格条件は1280x800・`yuv422_yuy2`・60 Hz付近の連続配信と正常診断である。
+
+## 14. MCP2515 CAN通信の設計・実装計画
 ### 14.1 目的と安全境界
 
 `mower_can` は、Pi接続のMCP2515をLinuxの`mcp251x`ドライバとSocketCANで`can0`として使用し、CAN 2.0BとROS 2の指令・状態を相互変換する。アプリケーションからMCP2515をSPIで直接制御しないため、実機CAN、`vcan0`、HILで同一のゲートウェイを検証できる。
