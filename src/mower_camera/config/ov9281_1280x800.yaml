@@ -1,0 +1,28 @@
+image_width: 1280
+image_height: 800
+camera_name: mower_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [726.36187908101977, 0, 650.33771450465792, 0, 726.83696652397634, 372.37749268349688, 0, 0, 1]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.089925850005517616, -0.11889319137230851, 0.0021063181029490436, -0.00071327467722772622, 0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [724.1763916015625, 0, 650.22484944328608, 0, 0, 738.6380615234375, 373.43940434097749, 0, 0, 0, 1, 0]
+binning_x: 0
+binning_y: 0
+roi:
+  x_offset: 0
+  y_offset: 0
+  height: 0
+  width: 0
+  do_rectify: false
