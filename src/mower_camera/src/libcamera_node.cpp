@@ -53,7 +53,13 @@ public:
     fixed_gain_ = declare_parameter<double>("analogue_gain", 0.0);
     mower_camera::validate_camera_parameters(params_);
     mower_camera::validate_camera_controls(fixed_exposure_us_, fixed_gain_);
-    if (!camera_info_url_.empty()) info_manager_.loadCameraInfo(camera_info_url_);
+    if (!camera_info_url_.empty()) {
+      if (!info_manager_.loadCameraInfo(camera_info_url_)) {
+        throw std::runtime_error("failed to load camera calibration: " + camera_info_url_);
+      }
+      mower_camera::validate_calibrated_camera_info(
+        info_manager_.getCameraInfo(), params_.width, params_.height);
+    }
     image_pub_ = create_publisher<sensor_msgs::msg::Image>("image_raw", rclcpp::SensorDataQoS());
     info_pub_ = create_publisher<sensor_msgs::msg::CameraInfo>("camera_info", rclcpp::SensorDataQoS());
     diagnostics_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);

@@ -1,0 +1,39 @@
+# OV9281 intrinsic calibration captured on 2026-08-15.
+# Target: 8x6 interior corners, 0.030 m square side; output: 1280x800.
+# Valid only for the recorded lens, focus, protective window, mounting, and
+# resolution. Recalibrate after changing any of them.
+image_width: 1280
+image_height: 800
+camera_name: ov9281_1280x800
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [726.3618790810198, 0.0, 650.3377145046579,
+         0.0, 726.8369665239763, 372.3774926834969,
+         0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.08992585000551762, -0.11889319137230851,
+         0.0021063181029490436, -0.0007132746772277262, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0,
+         0.0, 1.0, 0.0,
+         0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [724.1763916015625, 0.0, 650.2248494432861, 0.0,
+         0.0, 738.6380615234375, 373.4394043409775, 0.0,
+         0.0, 0.0, 1.0, 0.0]
+binning_x: 0
+binning_y: 0
+roi:
+  x_offset: 0
+  y_offset: 0
+  height: 0
+  width: 0
+  do_rectify: false

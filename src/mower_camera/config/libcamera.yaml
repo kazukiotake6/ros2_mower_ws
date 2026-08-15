@@ -6,7 +6,7 @@ libcamera_node:
     pixel_format: YUYV
     frame_id: camera_optical_frame
     camera_id: ''
-    camera_info_url: ''
+    camera_info_url: 'package://mower_camera/config/ov9281_1280x800.yaml'
     # 0 uses libcamera auto-exposure and auto-gain.
     exposure_time_us: 0
     analogue_gain: 0.0

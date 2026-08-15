@@ -29,3 +29,24 @@ TEST(CameraParameters, rejects_invalid_dimensions_and_frame_id)
   p.height = 800; p.frame_id = "";
   EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument);
 }
+
+TEST(CameraCalibration, accepts_matching_calibration)
+{
+  sensor_msgs::msg::CameraInfo info;
+  info.width = 1280; info.height = 800; info.distortion_model = "plumb_bob";
+  info.d = {0.1, -0.2, 0.0, 0.0, 0.0};
+  info.k = {500.0, 0.0, 640.0, 0.0, 501.0, 400.0, 0.0, 0.0, 1.0};
+  info.p = {500.0, 0.0, 640.0, 0.0, 0.0, 501.0, 400.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+  EXPECT_NO_THROW(mower_camera::validate_calibrated_camera_info(info, 1280, 800));
+}
+
+TEST(CameraCalibration, rejects_size_mismatch_and_invalid_intrinsics)
+{
+  sensor_msgs::msg::CameraInfo info;
+  info.width = 640; info.height = 480; info.distortion_model = "plumb_bob"; info.d = {0.1};
+  info.k = {500.0, 0.0, 320.0, 0.0, 500.0, 240.0, 0.0, 0.0, 1.0};
+  info.p = {500.0, 0.0, 320.0, 0.0, 0.0, 500.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+  EXPECT_THROW(mower_camera::validate_calibrated_camera_info(info, 1280, 800), std::invalid_argument);
+  info.width = 1280; info.height = 800; info.k[0] = 0.0;
+  EXPECT_THROW(mower_camera::validate_calibrated_camera_info(info, 1280, 800), std::invalid_argument);
+}
