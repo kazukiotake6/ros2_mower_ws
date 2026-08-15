@@ -84,6 +84,12 @@ ros2 topic echo --once /camera_info
 
 期待値は、`/image_raw`、`/camera_info`、`/diagnostics`が存在し、`/image_raw`の実効レートが要求値に近いことです。次にチェッカーボードで内部パラメータを較正し、`camera_info_url`を指定して歪み・画像サイズを確認します。
 
+## カメラキャリブレーション
+
+OV9281のチェッカーボード較正、成果物の版管理、受入れ条件は[`camera_calibration.md`](camera_calibration.md)を参照してください。較正YAMLを指定した場合、ノードはロード成功に加え、YAMLの解像度が要求streamと一致し、歪み係数と有効な内部パラメータを持つことを確認します。不一致の場合は誤った内部パラメータを配信せず、起動に失敗します。
+
+較正結果の数値はカメラ個体と取付状態に固有です。実機で生成・レビューした値だけを追加し、サンプル値や他個体の値を流用しないでください。
+
 ## トラブルシューティング
 
 - `no libcamera camera found`: センサーが列挙されていません。ケーブル、電源、`camera_auto_detect`、overlay、カーネルログを確認します。`/dev/media*`の存在だけではCSIセンサーの認識を保証しません。

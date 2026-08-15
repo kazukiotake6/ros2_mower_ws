@@ -3,6 +3,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <sensor_msgs/msg/camera_info.hpp>
 #include <string>
 namespace mower_camera
 {
@@ -10,6 +11,8 @@ struct CameraParameters { int width{1280}; int height{800}; double frame_rate{60
 struct ImageBufferLayout { uint32_t width; uint32_t height; uint32_t stride; size_t bytes_used; size_t mapped_length; std::string pixel_format; };
 void validate_camera_parameters(const CameraParameters & parameters);
 void validate_camera_controls(int exposure_time_us, double analogue_gain);
+void validate_calibrated_camera_info(
+  const sensor_msgs::msg::CameraInfo & camera_info, int expected_width, int expected_height);
 std::string image_encoding_for_pixel_format(const std::string & pixel_format);
 void validate_image_buffer_layout(const ImageBufferLayout & layout);
 }
