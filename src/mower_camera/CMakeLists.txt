@@ -26,6 +26,9 @@ install(TARGETS camera_parameters libcamera_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/headless_camera_calibration.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME headless_camera_calibration)
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
