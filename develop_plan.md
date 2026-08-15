@@ -269,15 +269,14 @@ BMI270はリセット後に公式の8 KiB設定ファイルをロードし、初
 
 ホスト側実装とOV9281での基本配信は検証済みである。画像ヘッダの時刻は、libcameraの単調クロックをROS時刻として誤用しないため、現状はPublish時のROSクロックを用いる。Camera-IMU同期評価の前に、ハードウェアのフレーム開始時刻との対応付けを実装・実測する必要がある。
 
-OV9281のPi 5上での検出、起動、1280x800・YUYV・60 Hz配信は13.6で完了している。次回以降は以下をこの順で実施する。
+OV9281のPi 5上での検出、起動、1280x800・YUYV・60 Hz配信と内部パラメータ較正は13.6および13.9で完了している。次回以降は以下をこの順で実施する。
 
-1. **OV9281較正**：チェッカーボードで内部パラメータ・歪みを算出し、較正YAMLを版管理する。`camera_info_url`指定時の画像サイズ、`frame_id`、歪み係数、再投影誤差を確認する。受入れ可能な再投影誤差と撮影距離・枚数はVIO担当と合意して記録する。
-2. **配信品質と診断**：固定露光・ゲイン、逆光、振動、汚れ、フレーム欠落をrosbag2で試験する。実効FPS、連続フレーム番号、キュー遅延、要求失敗、再起動回数を`/diagnostics`へ追加し、欠落・遅延を観測可能にする。
-3. **IMX296実機対応**：Pi 5での検出・起動、libcameraが実際に受理した解像度・画素形式・実効FPSを記録する。OV9281と混同しないセンサー別の既定YAMLまたは起動プロファイルを用意し、各プロファイルで`/image_raw`と`/camera_info`を確認する。
-4. **Camera-IMU時刻同期**：フレーム開始、BMI270 IRQ、画像Publish時刻をロジアナで同時計測し、平均オフセット、最大ジッタ、連続運転時のドリフトを記録する。結果を基に、フレーム開始のハードウェア時刻をROS時刻へ対応付ける処理を実装し、時刻逆行・過大ジッタを診断する。
-5. **VIO統合**：未較正、較正済み、時刻補正済みの条件で追跡損失、姿勢ドリフト、再現性を比較する。要求性能を満たさなければ、共通トリガまたはハードウェアタイムスタンプ経路を設計する。
-6. **実走耐性評価**：モータ・ブレードの安全条件を満たした状態で、芝生、日照変化、振動、防水窓の汚れを含む低速試験を実施する。推定品質低下時の上位停止要求を確認するが、最終停止は外部MCUと独立安全回路に委ねる。
-7. 実機結果、測定ログ、残存リスクを反映してコミットとPRを作成する。
+1. **配信品質と診断**：固定露光・ゲイン、逆光、振動、汚れ、フレーム欠落をrosbag2で試験する。実効FPS、連続フレーム番号、キュー遅延、要求失敗、再起動回数を`/diagnostics`へ追加し、欠落・遅延を観測可能にする。
+2. **IMX296実機対応**：Pi 5での検出・起動、libcameraが実際に受理した解像度・画素形式・実効FPSを記録する。OV9281と混同しないセンサー別の既定YAMLまたは起動プロファイルを用意し、各プロファイルで`/image_raw`と`/camera_info`を確認する。
+3. **Camera-IMU時刻同期**：フレーム開始、BMI270 IRQ、画像Publish時刻をロジアナで同時計測し、平均オフセット、最大ジッタ、連続運転時のドリフトを記録する。結果を基に、フレーム開始のハードウェア時刻をROS時刻へ対応付ける処理を実装し、時刻逆行・過大ジッタを診断する。
+4. **VIO統合**：未較正、較正済み、時刻補正済みの条件で追跡損失、姿勢ドリフト、再現性を比較する。要求性能を満たさなければ、共通トリガまたはハードウェアタイムスタンプ経路を設計する。
+5. **実走耐性評価**：モータ・ブレードの安全条件を満たした状態で、芝生、日照変化、振動、防水窓の汚れを含む低速試験を実施する。推定品質低下時の上位停止要求を確認するが、最終停止は外部MCUと独立安全回路に委ねる。
+6. 実機結果、測定ログ、残存リスクを反映してコミットとPRを作成する。
 
 ### 13.3 後続フェーズ
 
@@ -326,6 +325,13 @@ Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281
 - Pi 5カーネルはOV9281（`10-0060`）とCSI `/dev/video0` を認識しているが、ROS Jazzyのlibcamera 0.7.1は `RPI pisp.cpp: Unable to acquire a CFE instance` によりカメラ0台となる。ROSノードも `no libcamera camera found` で終了し、画像・CameraInfoは未配信。
 - 再起動後は `sudo apt-get update && sudo apt-get upgrade` 後に、`uname -r`、`dpkg-query -W linux-image-raspi linux-firmware-raspi libcamera0.2 libcamera-ipa ros-jazzy-libcamera`、`cam -l` を実行する。OV9281が列挙されなければ `LIBCAMERA_LOG_LEVELS='*:DEBUG' cam -l` のログを保存し、ROS試験へ進まない。
 - 列挙された場合はworktreeで `source /opt/ros/jazzy/setup.bash && colcon build --packages-select mower_camera && source install/setup.bash` を実行し、`ros2 launch mower_camera libcamera.launch.py` と、別端末の `ros2 topic hz /image_raw`、`ros2 topic echo --once /camera_info`、`ros2 topic echo --once /diagnostics` を確認する。合格条件は1280x800・`yuv422_yuy2`・60 Hz付近の連続配信と正常診断である。
+
+### 13.9 OV9281キャリブレーション・ROS再配信確認（2026-08-15）
+
+- OV9281を`/usr/local`のRaspberry Pi版libcamera `v0.7.1+rpt20260429`で列挙し、PiSP CFE/ISPへの登録と1280x800の実フレーム取得を確認した。
+- `mower_camera/config/ov9281_1280x800.yaml`に内部行列、歪み係数、射影行列を版管理した。既定の`libcamera.yaml`はこのプロファイルを`package://mower_camera/config/ov9281_1280x800.yaml`で指定する。
+- `mower_camera`の実機起動では`/image_raw`、`/camera_info`、`/diagnostics`を確認し、CameraInfoの1280x800、`plumb_bob`、K/D/R/PがキャリブレーションYAMLと一致することを合格条件とする。
+- ROS Jazzy同梱libcameraはPiSP CFEを列挙できないため、起動前に`LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib:/opt/ros/jazzy/lib/aarch64-linux-gnu`と`LIBCAMERA_IPA_MODULE_PATH=/usr/local/lib/aarch64-linux-gnu/libcamera/ipa`を設定する。
 
 ## 14. MCP2515 CAN通信の設計・実装計画
 ### 14.1 目的と安全境界

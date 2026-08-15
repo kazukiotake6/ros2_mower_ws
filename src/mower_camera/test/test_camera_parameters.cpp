@@ -7,6 +7,14 @@
 TEST(CameraParameters, accepts_vio_profile) { mower_camera::CameraParameters p; EXPECT_NO_THROW(mower_camera::validate_camera_parameters(p)); EXPECT_EQ(mower_camera::image_encoding_for_pixel_format("yuyv"), "yuv422_yuy2"); }
 TEST(CameraParameters, rejects_invalid_frame_rate)
 { mower_camera::CameraParameters p; p.frame_rate = 0.0; EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument); }
+TEST(CameraParameters, rejects_non_finite_frame_rate)
+{
+  mower_camera::CameraParameters p;
+  p.frame_rate = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument);
+  p.frame_rate = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument);
+}
 TEST(CameraParameters, rejects_unknown_pixel_format)
 { mower_camera::CameraParameters p; p.pixel_format = "NV12"; EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument); }
 TEST(CameraParameters, rejects_invalid_camera_controls)
@@ -28,4 +36,16 @@ TEST(CameraParameters, rejects_invalid_dimensions_and_frame_id)
   EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument);
   p.height = 800; p.frame_id = "";
   EXPECT_THROW(mower_camera::validate_camera_parameters(p), std::invalid_argument);
+}
+
+TEST(CameraParameters, validates_image_buffer_layout)
+{
+  mower_camera::ImageBufferLayout layout{1280, 800, 2560, 2048000, 2048000, "YUYV"};
+  EXPECT_NO_THROW(mower_camera::validate_image_buffer_layout(layout));
+  layout.stride = 2559;
+  EXPECT_THROW(mower_camera::validate_image_buffer_layout(layout), std::invalid_argument);
+  layout.stride = 2560; layout.bytes_used = 2047999;
+  EXPECT_THROW(mower_camera::validate_image_buffer_layout(layout), std::invalid_argument);
+  layout.bytes_used = 2048000; layout.mapped_length = 2047999;
+  EXPECT_THROW(mower_camera::validate_image_buffer_layout(layout), std::invalid_argument);
 }

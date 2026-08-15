@@ -119,6 +119,8 @@ private:
     image.width = config_->at(0).size.width; image.height = config_->at(0).size.height;
     image.encoding = mower_camera::image_encoding_for_pixel_format(params_.pixel_format);
     image.is_bigendian = false; image.step = config_->at(0).stride;
+    mower_camera::validate_image_buffer_layout(
+      {image.width, image.height, image.step, plane.bytesused, mapping.length, params_.pixel_format});
     image.data.assign(static_cast<uint8_t *>(mapping.address), static_cast<uint8_t *>(mapping.address) + plane.bytesused);
     image_pub_->publish(image);
     auto info = info_manager_.getCameraInfo(); info.header = image.header; info.width = image.width; info.height = image.height; info_pub_->publish(info);

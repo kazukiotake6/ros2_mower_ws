@@ -101,3 +101,14 @@ FATAL [libcamera_node]: no libcamera camera found
 ```
 
 初回検証時は`libcamera-ipa`が未導入でした。その後導入済みの状態で再試行し、IPA警告は解消されましたが、カメラの列挙は依然0台でした。カーネルにはCSI受信機、OV9281、IMX296に対応するデバイス・ログが見つかっていません。CSIケーブル、コネクタ、電源断時の再接続、センサー用overlayを確認した後、「起動確認」のコマンドを再実行して実機合格とします。
+
+## 実機再検証結果（2026-08-15）
+
+OV9281はPiSP対応のRaspberry Pi版libcamera `v0.7.1+rpt20260429`で列挙・配信する。ROS Jazzy同梱版ではPiSP CFEを取得できないため、起動時は次の環境を設定する。
+
+```bash
+export LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib:/opt/ros/jazzy/lib/aarch64-linux-gnu
+export LIBCAMERA_IPA_MODULE_PATH=/usr/local/lib/aarch64-linux-gnu/libcamera/ipa
+```
+
+既定の`config/libcamera.yaml`は、1280x800用の`package://mower_camera/config/ov9281_1280x800.yaml`を読み込む。起動後は`/image_raw`、`/camera_info`、`/diagnostics`を確認し、CameraInfoの画像サイズ、`plumb_bob`、K/D/R/PがYAMLと一致することを確認する。解像度、レンズ、フォーカス、保護窓、取付状態を変更した場合は、このYAMLを使用せず再キャリブレーションする。
