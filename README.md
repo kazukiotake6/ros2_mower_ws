@@ -3,6 +3,7 @@
 [`develop_plan.md`](develop_plan.md) で定義した自律走行芝刈りロボット向けのROS 2 Jazzy 開発ワークスペースです。
 Raspberry Pi 5向けのarm64環境と、開発PC向けのx86_64環境の両方で動作します。
 CSIカメラの仕様・起動方法・実機検証状況は [`docs/camera_libcamera.md`](docs/camera_libcamera.md) を参照してください。
+文書体系と不足文書の作成順は [`docs/README.md`](docs/README.md) を参照してください。実装作業を行うエージェントは、必ず [`AGENTS.md`](AGENTS.md) の安全境界と確認事項に従ってください。
 ハードウェア依存の機能はROS 2パッケージの境界で分離します。
 
 ## 開始方法
