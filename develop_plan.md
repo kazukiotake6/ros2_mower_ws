@@ -333,6 +333,13 @@ Ubuntu標準のlibcamera 0.2.0はPi 5のPiSPパイプラインを含まずOV9281
 - `mower_camera`の実機起動では`/image_raw`、`/camera_info`、`/diagnostics`を確認し、CameraInfoの1280x800、`plumb_bob`、K/D/R/PがキャリブレーションYAMLと一致することを合格条件とする。
 - ROS Jazzy同梱libcameraはPiSP CFEを列挙できないため、起動前に`LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib:/opt/ros/jazzy/lib/aarch64-linux-gnu`と`LIBCAMERA_IPA_MODULE_PATH=/usr/local/lib/aarch64-linux-gnu/libcamera/ipa`を設定する。
 
+### 13.10 OV9281固定条件較正の保留（2026-08-17）
+
+- 基板およびレンズに製造者シリアル番号などの識別表示がないOV9281個体には、プロジェクト資産ID`cam-ov9281-001`を付与した。
+- 固定露光`4000 us`・アナログゲイン`2.0`でGUIの`camera_calibration`を試行し、チェッカーボード（内側コーナー8x6、square 0.030 m）の画像116枚を`/tmp/calibrationdata.tar.gz`へ保存した。このアーカイブはGit管理外とする。
+- GUIはフリーズ、重複起動、終了後の残留プロセスが発生して安定運用できなかった。今回の試行では新しいYAMLのCOMMITおよび再投影RMSの記録を完了できていないため、既存の`ov9281_1280x800.yaml`を新規較正結果として更新・VIOへ適用してはならない。
+- GUI較正は保留し、再開時はGUIの安定化を確認するか、合意済みのRMS閾値を指定した`headless_camera_calibration`を用いる。新しいCameraInfo YAML、`record.md`、実測RMS、閾値と判定がそろうまで、単眼内部パラメータの受入れは未完了とする。
+
 ## 14. MCP2515 CAN通信の設計・実装計画
 ### 14.1 目的と安全境界
 

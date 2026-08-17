@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Mower maintainers
 # SPDX-License-Identifier: Apache-2.0
-"""Collect chessboard observations from ROS 2 and write a CameraInfo YAML."""
+"""Collect chessboard observations and write CameraInfo plus a calibration record."""
 
 import argparse
 import math
@@ -26,7 +26,13 @@ def arguments():
     parser.add_argument("--min-interval", type=float, default=0.5)
     parser.add_argument("--timeout", type=float, default=300.0)
     parser.add_argument("--camera-name", default="ov9281_cam0")
+    parser.add_argument("--camera-id", required=True, help="camera serial number or asset ID")
+    parser.add_argument("--exposure-time-us", required=True, type=int)
+    parser.add_argument("--analogue-gain", required=True, type=float)
+    parser.add_argument("--rms-threshold-px", required=True, type=float)
+    parser.add_argument("--software-revision", required=True, help="Git commit used for the run")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--record", required=True, help="Markdown test-record output path")
     args = parser.parse_args()
     try:
         columns, rows = (int(value) for value in args.size.lower().split("x", 1))
@@ -35,6 +41,8 @@ def arguments():
         raise error
     if columns < 2 or rows < 2 or args.square <= 0.0 or args.samples < 10:
         parser.error("size must be at least 2x2, square positive, and samples at least 10")
+    if args.exposure_time_us <= 0 or args.analogue_gain <= 0.0 or args.rms_threshold_px <= 0.0:
+        parser.error("exposure, gain, and RMS threshold must be positive fixed values")
     args.pattern_size = (columns, rows)
     return args
 
@@ -57,6 +65,34 @@ def write_camera_info(path, camera_name, image_size, camera_matrix, distortion):
         yaml_matrix("distortion_coefficients", 1, len(distortion), distortion.ravel()) +
         yaml_matrix("rectification_matrix", 3, 3, np.eye(3).ravel()) +
         yaml_matrix("projection_matrix", 3, 4, projection.ravel()))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(contents, encoding="utf-8")
+
+
+def write_record(path, args, image_size, rms, errors):
+    """Write an auditable measured result, rather than a record template."""
+    width, height = image_size
+    verdict = "PASS" if rms <= args.rms_threshold_px else "FAIL"
+    contents = f"""# OV9281 固定露光・固定ゲイン較正記録
+
+| 項目 | 記録値 |
+| --- | --- |
+| カメラ個体ID | {args.camera_id} |
+| ソフトウェア revision | {args.software_revision} |
+| 画像 | {width}x{height}、`{args.image_topic}` |
+| チェッカーボード | 内側コーナー{args.pattern_size[0]}x{args.pattern_size[1]}、square {args.square:.6f} m |
+| 採用画像数 | {len(errors)} |
+| 露光時間 | {args.exposure_time_us} us（固定） |
+| アナログゲイン | {args.analogue_gain:g}（固定） |
+| 再投影 RMS | {rms:.6f} px |
+| RMS 閾値 | {args.rms_threshold_px:.6f} px |
+| 判定 | **{verdict}** |
+| 平均画像誤差 | {np.mean(errors):.6f} px |
+| 最大画像誤差 | {np.max(errors):.6f} px |
+
+この記録は単眼内部パラメータの受入れ結果であり、Camera-IMU外部パラメータ、時刻同期、
+直線性および実走VIOの受入れを代替しない。
+"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(contents, encoding="utf-8")
 
@@ -156,9 +192,11 @@ class HeadlessCalibrator(Node):
             projected, _ = cv2.projectPoints(object_points, rotation, translation, camera_matrix, distortion)
             errors.append(float(cv2.norm(image_points, projected, cv2.NORM_L2) / len(projected)))
         output = pathlib.Path(self.args.output).expanduser().resolve()
+        record = pathlib.Path(self.args.record).expanduser().resolve()
         write_camera_info(output, self.args.camera_name, self.image_size, camera_matrix, distortion)
+        write_record(record, self.args, self.image_size, rms, errors)
         self.get_logger().info(
-            f"wrote {output}; samples={len(self.image_points)}, rms={rms:.4f}px, "
+            f"wrote {output} and {record}; samples={len(self.image_points)}, rms={rms:.4f}px, "
             f"mean={np.mean(errors):.4f}px, max={np.max(errors):.4f}px")
 
 
