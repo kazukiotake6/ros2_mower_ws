@@ -10,6 +10,7 @@
 | [camera_libcamera.md](camera_libcamera.md) | `mower_camera`のCSI/libcamera仕様、起動、診断、実機検証 |
 | [camera_calibration.md](camera_calibration.md) | OV9281の較正手順、成果物、受入れ条件、実施記録 |
 | [../develop_plan.md](../develop_plan.md) | システム計画、設計方針、未完了事項、実装再開記録 |
+| [resume-memo.md](resume-memo.md) | 現在の作業ブランチ、実機検証結果、次回の再開手順 |
 
 ## 文書を追加・更新する際の原則
 
