@@ -1,29 +1,31 @@
 # 作業再開用覚え書き
 
-最終更新: 2026-08-19
+最終更新: 2026-08-30
 
 ## 再開指示
 
 次回は「覚え書きを見て続きの作業から再開してください」と指示されたら、まずこの文書、`AGENTS.md`、`README.md`、`docs/README.md`、`develop_plan.md`、`docs/subsystems/localization/implementation-plan.md`、カメラ・IMU・VIO関連仕様を確認する。
 
-## 作業ブランチと未コミット変更
+## 作業ブランチとPR
 
 - ブランチ: `feat/vio-implementation`
 - ベース: `feat/ov9281-fixed-calibration-rms`の`b80d9bf`
-- 未コミットのVIO作業:
+- PR: [#12 feat(localization): VIO入力基盤を追加](https://github.com/kazukiotake6/ros2_mower_ws/pull/12)
+- PRに含めるVIO作業:
   - `docs/architecture/`、`docs/subsystems/localization/`、`docs/verification/`、`docs/adr/`
-  - `src/mower_localization/`のVIO入力バッファと単体テスト
+  - `src/mower_localization/`のVIO入力バッファ、入力検証器、lifecycleノードの土台と単体テスト
   - `develop_plan.md`、`docs/README.md`、本覚え書き
 - `?? .worktrees/` はユーザーの未追跡項目であり、変更・削除しない。
 
-## VIO実装進捗（2026-08-19）
+## VIO実装進捗（2026-08-30）
 
 - VIO実装計画、localization仕様、ROSインターフェース、座標系、時刻同期、受入れ基準を追加した。
 - Basaltを直接取り込まず、依存を隔離する暫定ADRを追加した。採用版はarm64・CI・ライセンス検証完了まで未確定とする。
-- `mower_localization`へBasalt非依存の`VioInputBuffer`を追加した。
-- IMUの非有限値、重複・逆行stamp、容量超過を拒否し、画像時刻までのIMUを順序どおり取り出せる。
+- `mower_localization`へBasalt非依存の`VioInputBuffer`と`VioInputValidator`を追加した。
+- IMUの非有限値、重複・逆行stamp、容量超過、許容gap超過を検出し、画像時刻までのIMUを順序どおり取り出せる。
+- `basalt_vio_node`のlifecycle土台を追加した。承認済み較正、Image/CameraInfo整合、IMU時刻順を検査し、Basalt推定器未接続時にOdometryをPublishしない。
 - `colcon build --packages-select mower_localization`は成功した。
-- 追加した7件のgtestは全件合格した。`colcon test-result --verbose`は50 tests、0 errors、0 failures、21 skipped。
+- 追加した12件のgtestは全件合格した。`colcon test-result --verbose`は56 tests、0 errors、0 failures、21 skipped。
 - 次の正式ゲートは固定露光・固定ゲイン条件のOV9281内部較正である。合意済みRMS閾値と最終取付状態の確認が必要であり、それまでは既存YAMLを承認済みVIO入力として扱わない。
 - BMI270 PoCの統合、公式API、FIFO、IRQ、SENSORTIMEはカメラ入力ゲート後の作業とする。
 

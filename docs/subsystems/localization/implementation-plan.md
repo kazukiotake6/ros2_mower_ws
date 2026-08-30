@@ -11,7 +11,7 @@ VIO、Raspberry Pi、ROS 2、CANは非安全系である。VIOの品質低下を
 - `mower_camera`はOV9281の1280x800、YUYV、約60 HzのROS配信を実機確認済み。
 - 固定露光・固定ゲイン条件の個体別内部較正は、合意済みRMS閾値による受入れが未完了であり、現行較正値をVIOの承認済み入力として扱わない。
 - `mower_imu`のBMI270 PoCは`feat/bmi270-raw-data`に存在するが、現在の開発ベースには未統合である。PoCは直接レジスタ初期化、ポーリング取得、Publish時のROS時刻を使用しており、公式設定ロード、FIFO、IRQ、SENSORTIME、時刻対応は未実装である。
-- `mower_localization`にはBasalt非依存のVIO入力バッファと単体テストを追加済みである。Basalt推定器、ROS 2ノード、TF、`mower_description`、`mower_bringup`の統合は未実装である。
+- `mower_localization`にはBasalt非依存のVIO入力バッファ、入力検証器、および`basalt_vio_node`のlifecycle土台を追加済みである。ノードは較正承認、Image/CameraInfo整合、IMU時刻順・gapを検査し、Basalt推定器が未接続の間は正常OdometryをPublishしない。Basalt推定器、TF、`mower_description`、`mower_bringup`の統合は未実装である。
 - CANと車輪オドメトリは承認済みプロトコルおよび実MCUが未確定のため、VIOとの融合および自走試験はまだ開始しない。
 - 2026-08-19に`mower_localization`をビルドし、入力バッファのgtest 7件が全件合格した。
 
