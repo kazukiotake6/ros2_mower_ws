@@ -1,6 +1,8 @@
 // Copyright 2026 Mower maintainers
 // SPDX-License-Identifier: Apache-2.0
 
+#include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -54,6 +56,7 @@ public:
       static_cast<std::size_t>(imu_queue_capacity));
     if (!validator_->configure(get_parameter("calibration_approved").as_bool())) {
       RCLCPP_ERROR(get_logger(), "%s", validator_->reason().c_str());
+      validator_.reset();
       return CallbackReturn::FAILURE;
     }
     const auto sensor_qos = rclcpp::SensorDataQoS();
@@ -61,6 +64,7 @@ public:
       "/image_raw", sensor_qos, [this](sensor_msgs::msg::Image::ConstSharedPtr message) {on_image(*message);});
     camera_info_subscription_ = create_subscription<sensor_msgs::msg::CameraInfo>(
       "/camera_info", sensor_qos, [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr message) {
+        record_input();
         validator_->update_camera_info(CameraInfoMetadata{
           to_nanoseconds(message->header.stamp), message->width, message->height,
           message->header.frame_id, has_valid_calibration(*message)});
@@ -72,26 +76,80 @@ public:
     diagnostics_publisher_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
     return CallbackReturn::SUCCESS;
   }
+
   CallbackReturn on_activate(const rclcpp_lifecycle::State &) override
   {
-    odometry_publisher_->on_activate(); status_publisher_->on_activate(); diagnostics_publisher_->on_activate();
-    publish_status(); return CallbackReturn::SUCCESS;
-  }
-  CallbackReturn on_deactivate(const rclcpp_lifecycle::State &) override
-  {
-    odometry_publisher_->on_deactivate(); status_publisher_->on_deactivate(); diagnostics_publisher_->on_deactivate();
+    odometry_publisher_->on_activate();
+    status_publisher_->on_activate();
+    diagnostics_publisher_->on_activate();
+    last_input_time_ = std::chrono::steady_clock::now();
+    input_timed_out_ = false;
+    const auto timeout_ms = get_parameter("input_timeout_ms").as_int();
+    const auto check_period_ms =
+      std::max<std::int64_t>(1, std::min<std::int64_t>(timeout_ms / 2, 100));
+    timeout_timer_ = create_wall_timer(
+      std::chrono::milliseconds(check_period_ms), [this]() {check_input_timeout();});
+    publish_status();
     return CallbackReturn::SUCCESS;
   }
+
+  CallbackReturn on_deactivate(const rclcpp_lifecycle::State &) override
+  {
+    if (timeout_timer_) {timeout_timer_->cancel();}
+    odometry_publisher_->on_deactivate();
+    status_publisher_->on_deactivate();
+    diagnostics_publisher_->on_deactivate();
+    return CallbackReturn::SUCCESS;
+  }
+
+  CallbackReturn on_cleanup(const rclcpp_lifecycle::State &) override
+  {
+    reset_resources();
+    return CallbackReturn::SUCCESS;
+  }
+
+  CallbackReturn on_shutdown(const rclcpp_lifecycle::State &) override
+  {
+    reset_resources();
+    return CallbackReturn::SUCCESS;
+  }
+
+  CallbackReturn on_error(const rclcpp_lifecycle::State &) override
+  {
+    reset_resources();
+    return CallbackReturn::SUCCESS;
+  }
+
 private:
+  void record_input()
+  {
+    last_input_time_ = std::chrono::steady_clock::now();
+    input_timed_out_ = false;
+  }
+
+  void check_input_timeout()
+  {
+    if (!validator_ || input_timed_out_) {return;}
+    const auto timeout = std::chrono::milliseconds(get_parameter("input_timeout_ms").as_int());
+    if (std::chrono::steady_clock::now() - last_input_time_ >= timeout) {
+      validator_->report_input_timeout();
+      input_timed_out_ = true;
+      publish_status();
+    }
+  }
+
   void on_imu(const sensor_msgs::msg::Imu & message)
   {
+    record_input();
     validator_->push_imu(ImuSample{to_nanoseconds(message.header.stamp),
       {message.angular_velocity.x, message.angular_velocity.y, message.angular_velocity.z},
       {message.linear_acceleration.x, message.linear_acceleration.y, message.linear_acceleration.z}});
     publish_status();
   }
+
   void on_image(const sensor_msgs::msg::Image & message)
   {
+    record_input();
     const bool accepted = validator_->accept_image(ImageMetadata{
       to_nanoseconds(message.header.stamp), message.width, message.height, message.header.frame_id});
     if (accepted) {
@@ -101,6 +159,7 @@ private:
     }
     publish_status();
   }
+
   void publish_status()
   {
     if (!validator_ || !status_publisher_ || !status_publisher_->is_activated()) {return;}
@@ -111,15 +170,39 @@ private:
     status.level = validator_->state() == VioState::kError ? diagnostic_msgs::msg::DiagnosticStatus::ERROR :
       (validator_->state() == VioState::kDegraded || validator_->state() == VioState::kLost ?
       diagnostic_msgs::msg::DiagnosticStatus::WARN : diagnostic_msgs::msg::DiagnosticStatus::OK);
-    diagnostic_msgs::msg::KeyValue state; state.key = "state"; state.value = to_string(validator_->state());
-    diagnostic_msgs::msg::KeyValue rejected; rejected.key = "rejected_images";
+    diagnostic_msgs::msg::KeyValue state;
+    state.key = "state";
+    state.value = to_string(validator_->state());
+    diagnostic_msgs::msg::KeyValue rejected;
+    rejected.key = "rejected_images";
     rejected.value = std::to_string(validator_->rejected_images());
-    status.values.push_back(state); status.values.push_back(rejected);
+    status.values.push_back(state);
+    status.values.push_back(rejected);
     status_publisher_->publish(status);
     diagnostic_msgs::msg::DiagnosticArray diagnostics;
-    diagnostics.header.stamp = now(); diagnostics.status.push_back(status); diagnostics_publisher_->publish(diagnostics);
+    diagnostics.header.stamp = now();
+    diagnostics.status.push_back(status);
+    diagnostics_publisher_->publish(diagnostics);
   }
+
+  void reset_resources()
+  {
+    if (timeout_timer_) {timeout_timer_->cancel();}
+    timeout_timer_.reset();
+    image_subscription_.reset();
+    camera_info_subscription_.reset();
+    imu_subscription_.reset();
+    odometry_publisher_.reset();
+    status_publisher_.reset();
+    diagnostics_publisher_.reset();
+    validator_.reset();
+    input_timed_out_ = false;
+  }
+
   std::unique_ptr<VioInputValidator> validator_;
+  rclcpp::TimerBase::SharedPtr timeout_timer_;
+  std::chrono::steady_clock::time_point last_input_time_{};
+  bool input_timed_out_{false};
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
@@ -134,5 +217,6 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
   const auto node = std::make_shared<mower_localization::BasaltVioNode>();
   rclcpp::spin(node->get_node_base_interface());
-  rclcpp::shutdown(); return 0;
+  rclcpp::shutdown();
+  return 0;
 }

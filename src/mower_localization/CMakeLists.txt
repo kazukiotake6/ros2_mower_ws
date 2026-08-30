@@ -24,8 +24,9 @@ install(TARGETS vio_input_buffer basalt_vio_node
   EXPORT export_vio_input_buffer
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -33,6 +34,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_vio_input_buffer vio_input_buffer)
   ament_add_gtest(test_vio_input_validator test/test_vio_input_validator.cpp)
   target_link_libraries(test_vio_input_validator vio_input_buffer)
+  find_package(launch_testing_ament_cmake REQUIRED)
+  add_launch_test(test/test_basalt_vio_lifecycle.py TIMEOUT 30)
 endif()
 
 ament_export_targets(export_vio_input_buffer HAS_LIBRARY_TARGET)

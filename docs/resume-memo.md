@@ -26,6 +26,8 @@
 - `basalt_vio_node`のlifecycle土台を追加した。承認済み較正、Image/CameraInfo整合、IMU時刻順を検査し、Basalt推定器未接続時にOdometryをPublishしない。
 - `colcon build --packages-select mower_localization`は成功した。
 - 追加した12件のgtestは全件合格した。`colcon test-result --verbose`は56 tests、0 errors、0 failures、21 skipped。
+- `basalt_vio_node`へ単調時計による入力timeout監視とcleanup/error時の資源解放を追加した。
+- 実プロセスのlifecycle結合試験で、正常な状態遷移、未承認較正、Image/CameraInfo不一致、入力timeout、Odometry非出力、cleanup後の再設定を確認した。Basalt推定器adapterと`TRACKING`出力試験は未実装である。
 - 次の正式ゲートは固定露光・固定ゲイン条件のOV9281内部較正である。合意済みRMS閾値と最終取付状態の確認が必要であり、それまでは既存YAMLを承認済みVIO入力として扱わない。
 - BMI270 PoCの統合、公式API、FIFO、IRQ、SENSORTIMEはカメラ入力ゲート後の作業とする。
 
