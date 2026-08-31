@@ -423,7 +423,7 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 
 完了条件は、launchを含む自動試験で正常系と異常系を再現でき、状態遷移と非出力保証が仕様に一致することである。実VIOの精度合格は含めない。
 
-進捗（2026-08-30）：実プロセスを用いる`launch_testing`を追加し、configure／activate、未承認較正の拒否、Image/CameraInfo不一致による`DEGRADED`、入力timeoutによる`LOST`、Odometry非出力、deactivate／cleanup後の再設定を自動確認した。実推定器adapterと`TRACKING`出力の結合試験はBasalt依存境界の実装時に追加する。
+進捗（2026-09-01）：実プロセスを用いる`launch_testing`に加え、`VioEstimatorAdapter`とfake estimatorによる結合試験を追加した。configure／activate、未承認較正の拒否、Image/CameraInfo不一致による`DEGRADED`、入力timeoutと推定器追跡喪失による`LOST`、有効な`TRACKING`時だけのOdometry出力、無効Odometry・推定器ERROR・Imu拒否時の非出力、inactive中の非出力、cleanup時のadapter resetと再設定を自動確認した。Basalt固有adapterの実装と実データ精度評価はフェーズ4以降で行う。
 
 ### 15.2 Basaltのオフライン技術検証
 

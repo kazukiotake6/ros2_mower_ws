@@ -14,14 +14,25 @@ target_include_directories(vio_input_buffer PUBLIC
 target_compile_features(vio_input_buffer PUBLIC cxx_std_17)
 target_compile_options(vio_input_buffer PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(basalt_vio_node src/basalt_vio_node.cpp)
-target_link_libraries(basalt_vio_node vio_input_buffer)
-ament_target_dependencies(basalt_vio_node diagnostic_msgs nav_msgs rclcpp rclcpp_lifecycle sensor_msgs)
+add_library(basalt_vio_node_lib src/basalt_vio_node.cpp)
+target_include_directories(basalt_vio_node_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(basalt_vio_node_lib vio_input_buffer)
+ament_target_dependencies(
+  basalt_vio_node_lib
+  diagnostic_msgs nav_msgs rclcpp rclcpp_lifecycle sensor_msgs)
+target_compile_features(basalt_vio_node_lib PUBLIC cxx_std_17)
+target_compile_options(basalt_vio_node_lib PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(basalt_vio_node src/basalt_vio_main.cpp)
+target_link_libraries(basalt_vio_node basalt_vio_node_lib)
+ament_target_dependencies(basalt_vio_node rclcpp)
 target_compile_features(basalt_vio_node PUBLIC cxx_std_17)
 target_compile_options(basalt_vio_node PRIVATE -Wall -Wextra -Wpedantic)
 
-install(TARGETS vio_input_buffer basalt_vio_node
-  EXPORT export_vio_input_buffer
+install(TARGETS vio_input_buffer basalt_vio_node_lib basalt_vio_node
+  EXPORT export_mower_localization
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
@@ -34,9 +45,15 @@ if(BUILD_TESTING)
   target_link_libraries(test_vio_input_buffer vio_input_buffer)
   ament_add_gtest(test_vio_input_validator test/test_vio_input_validator.cpp)
   target_link_libraries(test_vio_input_validator vio_input_buffer)
+  ament_add_gtest(test_vio_estimator_adapter test/test_vio_estimator_adapter.cpp)
+  target_link_libraries(test_vio_estimator_adapter basalt_vio_node_lib)
+  ament_target_dependencies(
+    test_vio_estimator_adapter
+    diagnostic_msgs nav_msgs rclcpp rclcpp_lifecycle sensor_msgs)
   find_package(launch_testing_ament_cmake REQUIRED)
   add_launch_test(test/test_basalt_vio_lifecycle.py TIMEOUT 30)
 endif()
 
-ament_export_targets(export_vio_input_buffer HAS_LIBRARY_TARGET)
+ament_export_targets(export_mower_localization HAS_LIBRARY_TARGET)
+ament_export_dependencies(diagnostic_msgs nav_msgs rclcpp rclcpp_lifecycle sensor_msgs)
 ament_package()

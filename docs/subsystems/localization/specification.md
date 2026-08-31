@@ -36,6 +36,16 @@
 - 入力欠損、drop、処理遅延、追跡状態、再初期化を診断へ記録する。
 - 根拠のないOdometry covarianceを生成しない。推定器から得られない場合の表現はROSインターフェース仕様で固定する。
 
+## 推定器adapter契約
+
+- ROS 2の購読、入力検証、lifecycle、診断、Odometry Publishは`BasaltVioNode`が担当し、推定器固有処理は`VioEstimatorAdapter`の実装へ閉じ込める。
+- adapterは検証済みImuを時刻順に受け取り、対応するImageとCameraInfoから`INITIALIZING`、`TRACKING`、`LOST`、`ERROR`の推定器状態を返す。
+- `TRACKING`では推定器が生成したOdometryを必須とし、stampは入力画像、frameは`vio_odom -> base_link`、poseとtwistは有限値でなければならない。
+- ノードはadapterが返したOdometryとcovarianceをそのまま検証・転送し、根拠のない姿勢、速度、covarianceを補完しない。
+- `LOST`、`ERROR`、無効Odometry、adapter例外、adapterによるImu拒否ではOdometryをPublishしない。
+- configureおよびcleanup時にadapterをresetし、前セッションの推定状態を次のセッションへ持ち越さない。
+- Basalt未接続の既定adapterは入力を受け入れても推定結果を生成せず、正常OdometryをPublishしない。
+
 ## パラメータ分類
 
 - topic、frame、QoS
