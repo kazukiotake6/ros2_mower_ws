@@ -103,6 +103,11 @@
   5. 既存地図に対する再ローカライゼーション
   6. 自己位置品質低下時の速度制限・停止要求
 
+  VIOの詳細な実装順、入力受入れ条件、ROSインターフェース、座標系、時刻同期、試験ゲートは
+  `docs/subsystems/localization/implementation-plan.md`を正とする。CAN仕様が未承認の間も、
+  rosbag2再生および手押しVIO評価は独立トラックとして進められるが、車輪融合と自走試験は
+  開始しない。
+
   芝生ではテクスチャ不足、草の揺れ、影、泥、水滴、車輪スリップが起こるため、VIO単独を唯一の安全根拠にしません。Piは推定品質低下を検知してMCUに減速・停止を要
   求し、MCUは通信・安全状態を独立して監視します。
 
@@ -402,3 +407,65 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 単体テストは全frame、境界値、符号/エンディアン、DLC不一致、未知ID、NaN/Inf、連番ロールオーバー、期限、状態遷移を対象とする。結合テストは`vcan0`で順序乱れ、欠落、再接続、topic変換、diagnosticsを確認する。実機では起動100回、連続通信、最大想定バス負荷、error counter、bus-off復旧を測定し、SPI共有時のBMI270とCANの要求レートも同時確認する。CAN_H/L断、終端不良、MCU/Pi停止、MCP2515電源断、SPI/INT断、異常ID/DLC、期限切れを故障注入し、MCUの独立停止とPiのFAULT/診断を確認する。
 
 成果物はprotocol仕様、配線・overlay手順、`mower_can`のcodec/gateway/message/launch/config、MCU simulator、単体・結合・HIL結果、CAN log、残存リスク一覧である。発振器、物理層、CAN ID、MCU timeoutはリポジトリだけでは確定できないため、承認済みの値で埋まるまで実装は`vcan0`とモータ無効ベンチ試験に限定する。
+
+## 15. ハードウェア非依存で先行する実装・試験トラック
+
+実機ゲートを待つ間も、未承認の校正値、CAN ID、timeout、機体寸法、安全状態を仮定せずに、次の順でホスト上の実装と自動試験を進める。ここでの合格はソフトウェア層の確認に限定し、Pi 5実時間性、センサー精度、CAN物理層、停止距離および最終安全性能の合格を代替しない。
+
+### 15.1 VIO lifecycleと入力異常の結合試験
+
+`mower_localization`の`basalt_vio_node`について、実推定器をfake adapterへ置換できる境界を設け、単体試験に加えてROS 2結合試験を実装する。
+
+- 必須パラメータ、未承認較正、Image/CameraInfo不一致、IMU欠損・重複・逆行・過大gapを検査する。
+- configure、activate、deactivate、cleanup、errorの各状態で、購読、キュー、status、diagnosticsおよび出力可否を確認する。
+- inactive、error、入力停止、追跡喪失中に、古いOdometryを正常値としてPublishしないことを確認する。
+- `DEGRADED`、`LOST`、再初期化の閾値は合意前に固定せず、試験から明示的に注入する。
+
+完了条件は、launchを含む自動試験で正常系と異常系を再現でき、状態遷移と非出力保証が仕様に一致することである。実VIOの精度合格は含めない。
+
+進捗（2026-08-30）：実プロセスを用いる`launch_testing`を追加し、configure／activate、未承認較正の拒否、Image/CameraInfo不一致による`DEGRADED`、入力timeoutによる`LOST`、Odometry非出力、deactivate／cleanup後の再設定を自動確認した。実推定器adapterと`TRACKING`出力の結合試験はBasalt依存境界の実装時に追加する。
+
+### 15.2 Basaltのオフライン技術検証
+
+フェーズ4をカメラ・IMU実機と独立してx86_64から開始する。GUIなしビルド、公開データセットでの上流基準動作、ROS 2依存との競合、メモリ、起動時間、推定品質情報を確認する。固定tag/commit、vendor化、パッチ、更新、脆弱性、third-partyライセンスおよびSBOMの管理方針をADRへ記録する。
+
+完了条件は、固定候補版をクリーン環境とCIで再現可能にビルドし、公開データセットの入力、実行条件、出力および既知の差分を記録できることである。Pi 5 arm64の実時間性と最終採用判定は別ゲートとする。
+
+### 15.3 合成rosbag2再生と故障注入
+
+実センサーbagを待たず、mower形式のImage、CameraInfo、Imuを生成するテストデータと再生試験を追加する。
+
+- 低速、実時間、高倍率再生で、同一入力に対する状態遷移と結果の再現性を確認する。
+- カメラ停止・低FPS、CameraInfo不一致、IMU欠損・重複・逆行、時刻ジャンプ、入力順序乱れ、ノード再起動を注入する。
+- rosbag2本体はGitへ追加せず、生成条件、seed、期待値および成果物識別子を版管理する。
+
+完了条件は、CIで小規模データを生成して異常検出と復旧動作を自動判定できることである。実環境の精度、ドリフトおよび追跡性能は判定しない。
+
+### 15.4 カメラdiagnosticsの純粋ロジック化
+
+libcamera request処理から統計集計を分離し、実効FPS、連続フレーム番号による欠落、キュー遅延、request失敗、再初期化、時刻逆行をハードウェアなしで単体試験する。正常、WARN、ERRORの判定閾値は設定から注入し、未合意値を既定値として固定しない。
+
+完了条件は、正常列、欠落、遅延、異常metadata、カウンタのリセット・飽和を決定論的に検証でき、実機ノードが同じ集計結果を`/diagnostics`へ反映できることである。実FPSとフレーム開始時刻の確認は実機試験に残す。
+
+### 15.5 CAN仕様承認後の仮想CAN試験
+
+CAN codec、gatewayおよびMCU simulatorは、`docs/interfaces/can-protocol.md`のID、DLC、配置、単位、version、連番、CRC、周期、timeoutが承認された後に実装する。承認前はインターフェース骨格と試験観点の整備に留め、暫定値を実車送信可能な設定として実装しない。
+
+承認後は純粋関数の境界値・任意バイト列試験と、`vcan0`による正常、欠落、順序乱れ、期限切れ、version不一致、再接続、状態遷移、diagnosticsの結合試験を行う。完了条件は、inactive/error中にmotion commandを送らず、異常入力を拒否してFAULTを観測できることである。これはMCUの独立停止試験を代替しない。
+
+### 15.6 文書・CI・構成管理
+
+`docs/documentation-structure.md`で優先指定された安全要求、配線、構成管理、試験戦略、CANプロトコルの文書を順次作成する。CAN、配線、安全の未確定値はTBDと根拠を明示し、承認前に実装既定値へ転記しない。
+
+CIにはワークスペースのbuild/testに加え、ament lint、Markdownリンク、追跡対象YAMLの構文・schema、launch/config読込み、合成再生試験を段階的に追加する。`mower_control`の固定値比較だけのテストは機能試験とみなさず、承認済み制御インターフェースに対する実装と境界値試験へ置き換える。
+
+### 15.7 推奨実施順
+
+1. VIO lifecycleと入力異常の結合試験
+2. 合成rosbag2生成・故障注入基盤
+3. Basalt x86_64オフライン技術検証
+4. カメラdiagnostics集計の分離と単体試験
+5. 文書、lint、リンク、YAML、launchのCI強化
+6. CAN仕様承認後のcodec、gateway、MCU simulator、`vcan0`試験
+
+各項目はホスト上の自動試験合格を記録したうえで、対応する実機、Pi 5、HILまたは安全検証ゲートへ引き渡す。
