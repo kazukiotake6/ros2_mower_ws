@@ -15,11 +15,13 @@ namespace mower_localization
 enum class VioState {kUnconfigured, kInitializing, kTracking, kDegraded, kLost, kError};
 
 struct VioInputLimits {std::int64_t max_imu_gap_ns{}; std::int64_t input_timeout_ns{};};
-struct CameraInfoMetadata {
+struct CameraInfoMetadata
+{
   std::int64_t stamp_ns{}; std::uint32_t width{}; std::uint32_t height{};
   std::string frame_id; bool calibrated{};
 };
-struct ImageMetadata {
+struct ImageMetadata
+{
   std::int64_t stamp_ns{}; std::uint32_t width{}; std::uint32_t height{}; std::string frame_id;
 };
 
@@ -30,12 +32,14 @@ public:
   bool configure(bool calibration_approved);
   ImuInsertResult push_imu(const ImuSample & sample);
   void update_camera_info(CameraInfoMetadata camera_info);
+  void report_estimator_error(std::string reason);
   bool accept_image(const ImageMetadata & image);
   void report_estimator_tracking(bool tracking);
   void report_input_timeout();
   [[nodiscard]] VioState state() const noexcept;
   [[nodiscard]] const std::string & reason() const noexcept;
   [[nodiscard]] std::size_t rejected_images() const noexcept;
+
 private:
   void set_state(VioState state, std::string reason);
   VioInputLimits limits_;
