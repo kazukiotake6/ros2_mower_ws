@@ -1,0 +1,25 @@
+version: 1
+defaults:
+  seed: 20260902
+  frame_count: 8
+  camera_period_ns: 100000000
+  imu_period_ns: 10000000
+  width: 16
+  height: 8
+  fault_index: 3
+
+scenarios:
+  - name: normal
+    fault: none
+  - name: camera_info_mismatch
+    fault: camera_info_mismatch
+  - name: imu_gap
+    fault: imu_gap
+    fault_index: 20
+  - name: imu_duplicate
+    fault: imu_duplicate
+    fault_index: 20
+  - name: image_time_jump
+    fault: image_time_jump
+  - name: camera_stop
+    fault: camera_stop

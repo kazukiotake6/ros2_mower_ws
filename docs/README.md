@@ -15,6 +15,7 @@
 | [architecture/coordinate-frames.md](architecture/coordinate-frames.md) | 車体、カメラ、IMU、VIOの座標フレーム契約 |
 | [architecture/time-synchronization.md](architecture/time-synchronization.md) | カメラ・IMU時刻源、変換、診断、受入れ値 |
 | [verification/vio-acceptance-criteria.md](verification/vio-acceptance-criteria.md) | VIOの段階別ゲートと試験条件 |
+| [verification/vio-synthetic-rosbag.md](verification/vio-synthetic-rosbag.md) | VIO合成rosbag2の生成契約、故障シナリオ、実行方法 |
 | [../develop_plan.md](../develop_plan.md) | システム計画、設計方針、未完了事項、ハードウェア非依存の先行実装・試験トラック、実装再開記録 |
 | [resume-memo.md](resume-memo.md) | 現在の作業ブランチ、実機検証結果、次回の再開手順 |
 
