@@ -233,12 +233,11 @@ BMI270とMCP2515はSPI0を共有し、CSと割込み線を専用化する。カ�
 
 ### 12.1 現在の作業状態
 
-- 作業ブランチは `feat/bmi270-raw-data`。変更は未コミットである。
-- `mower_imu` に `bmi270_raw_node` を追加済み。SPI0/CE0（既定 `/dev/spidev0.0`）を開き、チップID確認、直接レジスタ設定、加速度・ジャイロのポーリング取得、`/imu/data_raw` へのSI単位Publishを実装している。
-- `spi_device`、`spi_speed_hz`、`accel_range_g`、`gyro_range_dps`、`poll_rate_hz`、`frame_id` はROSパラメータ化済みである。
-- `colcon build --packages-select mower_imu` は成功している。
-- Bosch公式BMI270 Sensor API（BSD-3-Clause）は `src/mower_imu/third_party/bmi270/` に取り込み済みで、ライセンスファイルも保持している。
-- CMakeには公式APIのビルド対象追加を開始しているが、ノードはまだ公式APIを呼び出していない。
+- `mower_imu`へBosch公式BMI270 Sensor API（BSD-3-Clause）とライセンスを取り込み、SPI read/write/delay callbackを接続した。
+- `bmi270_init()`によるチップID確認・公式設定ロード後、加速度4 g・200 Hzとジャイロ2000 deg/s・200 Hzを公式APIで設定し、両センサーを有効化する。
+- 初期化段階とAPI戻り値を`/diagnostics`へ出力し、失敗時はデータを正常入力として公開しない。
+- SPIと公式APIを抽象化し、ハードウェアなしで通信失敗、不正チップID相当、設定失敗、バースト書込みを単体試験できる。
+- Pi 5と実BMI270による検証は未実施であり、FIFO、IRQ、SENSORTIME、時刻対応、`/imu/data_raw` Publishは後続とする。
 
 ### 12.2 実装上の重要な未完了事項
 

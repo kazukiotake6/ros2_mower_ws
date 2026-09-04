@@ -9,6 +9,8 @@
 | [documentation-structure.md](documentation-structure.md) | 文書体系の目標構成、不足文書、作成順、構成管理方針 |
 | [camera_libcamera.md](camera_libcamera.md) | `mower_camera`のCSI/libcamera仕様、起動、診断、実機検証 |
 | [camera_calibration.md](camera_calibration.md) | OV9281の較正手順、成果物、受入れ条件、実施記録 |
+| [subsystems/imu/specification.md](subsystems/imu/specification.md) | BMI270の初期化、SPI callback、異常時動作 |
+| [configuration-management/dependency-baseline.md](configuration-management/dependency-baseline.md) | 外部依存の固定版、ライセンス、更新条件 |
 | [subsystems/localization/implementation-plan.md](subsystems/localization/implementation-plan.md) | VIOの実装順、依存関係、移行条件、未確定事項 |
 | [subsystems/localization/specification.md](subsystems/localization/specification.md) | VIOの入力前提、状態、データ処理規則 |
 | [architecture/ros-interfaces.md](architecture/ros-interfaces.md) | VIOを含むROS topic、QoS、TF責務 |
