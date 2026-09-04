@@ -91,7 +91,6 @@ BasaltVioNode::CallbackReturn BasaltVioNode::on_configure(const rclcpp_lifecycle
   camera_info_subscription_ = create_subscription<sensor_msgs::msg::CameraInfo>(
     "/camera_info", sensor_qos,
     [this](sensor_msgs::msg::CameraInfo::ConstSharedPtr message) {
-      record_input();
       camera_info_ = *message;
       validator_->update_camera_info(CameraInfoMetadata{
         to_nanoseconds(message->header.stamp), message->width, message->height,
@@ -112,7 +111,8 @@ BasaltVioNode::CallbackReturn BasaltVioNode::on_activate(const rclcpp_lifecycle:
   odometry_publisher_->on_activate();
   status_publisher_->on_activate();
   diagnostics_publisher_->on_activate();
-  last_input_time_ = std::chrono::steady_clock::now();
+  last_image_time_ = std::chrono::steady_clock::now();
+  last_imu_time_ = last_image_time_;
   input_timed_out_ = false;
   const auto timeout_ms = get_parameter("input_timeout_ms").as_int();
   const auto check_period_ms =
@@ -150,9 +150,15 @@ BasaltVioNode::CallbackReturn BasaltVioNode::on_error(const rclcpp_lifecycle::St
   return CallbackReturn::SUCCESS;
 }
 
-void BasaltVioNode::record_input()
+void BasaltVioNode::record_image_input()
 {
-  last_input_time_ = std::chrono::steady_clock::now();
+  last_image_time_ = std::chrono::steady_clock::now();
+  input_timed_out_ = false;
+}
+
+void BasaltVioNode::record_imu_input()
+{
+  last_imu_time_ = std::chrono::steady_clock::now();
   input_timed_out_ = false;
 }
 
@@ -160,7 +166,8 @@ void BasaltVioNode::check_input_timeout()
 {
   if (!validator_ || input_timed_out_) {return;}
   const auto timeout = std::chrono::milliseconds(get_parameter("input_timeout_ms").as_int());
-  if (std::chrono::steady_clock::now() - last_input_time_ >= timeout) {
+  const auto now = std::chrono::steady_clock::now();
+  if (now - last_image_time_ >= timeout || now - last_imu_time_ >= timeout) {
     validator_->report_input_timeout();
     input_timed_out_ = true;
     publish_status();
@@ -169,7 +176,7 @@ void BasaltVioNode::check_input_timeout()
 
 void BasaltVioNode::on_imu(const sensor_msgs::msg::Imu & message)
 {
-  record_input();
+  record_imu_input();
   const auto result = validator_->push_imu(ImuSample{to_nanoseconds(message.header.stamp),
         {message.angular_velocity.x, message.angular_velocity.y, message.angular_velocity.z},
         {message.linear_acceleration.x, message.linear_acceleration.y,
@@ -182,7 +189,7 @@ void BasaltVioNode::on_imu(const sensor_msgs::msg::Imu & message)
 
 void BasaltVioNode::on_image(const sensor_msgs::msg::Image & message)
 {
-  record_input();
+  record_image_input();
   const bool accepted = validator_->accept_image(ImageMetadata{
       to_nanoseconds(message.header.stamp), message.width, message.height,
       message.header.frame_id});

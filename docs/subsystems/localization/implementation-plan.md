@@ -6,7 +6,7 @@
 
 VIO、Raspberry Pi、ROS 2、CANは非安全系である。VIOの品質低下を検出した場合、上位機能へ減速・停止要求の根拠を通知するが、最終的なモータ・ブレード停止は外部MCUと独立E-stop・遮断回路が担う。VIOノードから実車CAN指令を直接送信しない。
 
-## 現在地（2026-08-19）
+## 現在地（2026-09-04）
 
 - `mower_camera`はOV9281の1280x800、YUYV、約60 HzのROS配信を実機確認済み。
 - 固定露光・固定ゲイン条件の個体別内部較正は、合意済みRMS閾値による受入れが未完了であり、現行較正値をVIOの承認済み入力として扱わない。
@@ -14,6 +14,7 @@ VIO、Raspberry Pi、ROS 2、CANは非安全系である。VIOの品質低下を
 - `mower_localization`にはBasalt非依存のVIO入力バッファ、入力検証器、および`basalt_vio_node`のlifecycle土台を追加済みである。ノードは較正承認、Image/CameraInfo整合、IMU時刻順・gapを検査し、Basalt推定器が未接続の間は正常OdometryをPublishしない。Basalt推定器、TF、`mower_description`、`mower_bringup`の統合は未実装である。
 - CANと車輪オドメトリは承認済みプロトコルおよび実MCUが未確定のため、VIOとの融合および自走試験はまだ開始しない。
 - 2026-08-19に`mower_localization`をビルドし、入力バッファのgtest 7件が全件合格した。
+- 合成rosbag2生成器と故障注入再生試験を追加し、正常、CameraInfo不一致、IMU欠損・重複、画像時刻逆行、カメラ停止をホスト上で自動判定する。生成済みbagはGitへ保存せず、catalog、seed、manifest契約だけを版管理する。
 
 ## 採用方針
 
