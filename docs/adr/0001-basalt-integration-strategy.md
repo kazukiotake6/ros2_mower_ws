@@ -1,6 +1,6 @@
 # ADR 0001: Basalt統合方式
 
-- 状態: 技術検証待ち
+- 状態: 技術検証中
 - 日付: 2026-08-19
 
 ## 文脈
@@ -14,6 +14,13 @@ VIO第一候補はBSD-3-ClauseのBasaltである。上流はCMakeとvcpkgによ�
 - Basalt依存は将来のvendorパッケージまたは外部インストールへ隔離し、`mower_localization`は薄い推定器interfaceを介して利用する。
 - 評価候補は上流リリース0.1.7とするが、x86_64、Pi 5 arm64、CI、ライセンス確認が終わるまで採用版として確定しない。
 - 実機入力より先に公開データセットとrosbag2再生でadapterを検証する。
+
+## オフライン検証で確認した制約
+
+- 候補`0.1.7`をtagだけでなくcommit、vcpkg submodule、registry baselineで固定する。
+- `basalt_vio --show-gui 0`によるヘッドレス実行経路は存在するが、CMakeはPangolinを無条件に要求するためGUI依存なしビルドではない。
+- 上流既定の`CXX_MARCH=native`はCI・配布物で使用せず、検証時は`generic`へ上書きする。
+- x86_64 configureをCIで検証する。公開データセット実行、third-partyライセンス、arm64および性能の条件が残るため、採用状態へは変更しない。
 
 ## 採用確定条件
 

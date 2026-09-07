@@ -1,0 +1,50 @@
+name: Basalt offline verification
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/basalt-offline-verification.yaml
+      - config/dependencies/basalt-0.1.7.json
+      - scripts/verify_basalt_source.py
+  workflow_dispatch:
+
+jobs:
+  source-baseline:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout fixed Basalt candidate
+        shell: bash
+        run: |
+          git clone --branch 0.1.7 --depth 1 \
+            https://gitlab.com/VladyslavUsenko/basalt.git /tmp/basalt
+      - name: Verify reviewed source baseline
+        shell: bash
+        run: |
+          python3 scripts/verify_basalt_source.py \
+            --checkout /tmp/basalt \
+            --baseline config/dependencies/basalt-0.1.7.json
+
+  x86_64-configure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install configure tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Checkout fixed Basalt candidate
+        shell: bash
+        run: |
+          git clone --branch 0.1.7 --depth 1 --recurse-submodules \
+            --shallow-submodules \
+            https://gitlab.com/VladyslavUsenko/basalt.git /tmp/basalt
+          git -C /tmp/basalt/thirdparty/vcpkg fetch origin \
+            05442024c3fda64320bd25d2251cc9807b84fb6f
+      - name: Bootstrap vcpkg and resolve x86_64 dependencies
+        shell: bash
+        run: |
+          cd /tmp/basalt
+          ./thirdparty/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          cmake --preset relwithdebinfo \
+            -DBASALT_FULLY_STATIC_BINARIES=OFF \
+            -DCXX_MARCH=generic \
+            -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja
