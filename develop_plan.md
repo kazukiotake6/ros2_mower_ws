@@ -431,6 +431,8 @@ PiのDevice Tree overlayはSPI0 CE1へMCP2515を割当てる。設定例は`dtov
 
 完了条件は、固定候補版をクリーン環境とCIで再現可能にビルドし、公開データセットの入力、実行条件、出力および既知の差分を記録できることである。Pi 5 arm64の実時間性と最終採用判定は別ゲートとする。
 
+進捗（2026-09-07）：候補`0.1.7`のcommitとvcpkg依存基線を機械可読に固定し、ソース整合検査とUbuntu 24.04 x86_64 configure CIを追加した。候補版はヘッドレス実行可能だがPangolinをconfigure時に必須とする。公開データセット実行、全体build/test、third-partyライセンス、SBOMおよびPi 5 arm64は未完了である。
+
 ### 15.3 合成rosbag2再生と故障注入
 
 実センサーbagを待たず、mower形式のImage、CameraInfo、Imuを生成するテストデータと再生試験を追加する。

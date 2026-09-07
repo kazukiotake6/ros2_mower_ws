@@ -93,6 +93,8 @@ VIO、Raspberry Pi、ROS 2、CANは非安全系である。VIOの品質低下を
 - CIとPi 5で再現可能にビルドできる。
 - 更新・脆弱性・ライセンス管理方法が決まっている。
 
+進捗（2026-09-07）：候補`0.1.7`のcommit、vcpkg submodule、registry baselineを固定し、ソース整合検査とUbuntu 24.04 x86_64のconfigure workflowを追加した。Pangolinがconfigure時に必須でありGUI依存なしビルドではないことを確認した。公開データセット実行、third-partyライセンス、SBOM、adapter API、Pi 5 arm64は未完了であり、フェーズ4の移行条件は未達である。
+
 ### フェーズ5: ROS 2 VIOノード
 
 `mower_localization`へlifecycle node `basalt_vio_node`を実装する。

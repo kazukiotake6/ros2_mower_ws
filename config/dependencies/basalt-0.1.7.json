@@ -1,0 +1,18 @@
+{
+  "upstream": "https://gitlab.com/VladyslavUsenko/basalt.git",
+  "tag": "0.1.7",
+  "commit": "6d8637b9d68ea18a1a63c1baa72818779e156932",
+  "license": "BSD-3-Clause",
+  "vcpkg_submodule_commit": "1e199d32ad53aab1defda61ce41c380302e3f95c",
+  "vcpkg_registry_baseline": "05442024c3fda64320bd25d2251cc9807b84fb6f",
+  "required_manifest_dependencies": [
+    "basalt-headers",
+    "boost-filesystem",
+    "eigen3",
+    "opencv4",
+    "pangolin",
+    "realsense2",
+    "rosbag",
+    "tbb"
+  ]
+}
