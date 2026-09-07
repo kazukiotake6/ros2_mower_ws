@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(mower_localization LANGUAGES CXX)
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -37,10 +38,15 @@ install(TARGETS vio_input_buffer basalt_vio_node_lib basalt_vio_node
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY include/ DESTINATION include)
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+ament_python_install_package(${PROJECT_NAME})
+install(PROGRAMS scripts/generate_vio_test_bag.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME generate_vio_test_bag)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
   ament_add_gtest(test_vio_input_buffer test/test_vio_input_buffer.cpp)
   target_link_libraries(test_vio_input_buffer vio_input_buffer)
   ament_add_gtest(test_vio_input_validator test/test_vio_input_validator.cpp)
@@ -52,6 +58,8 @@ if(BUILD_TESTING)
     diagnostic_msgs nav_msgs rclcpp rclcpp_lifecycle sensor_msgs)
   find_package(launch_testing_ament_cmake REQUIRED)
   add_launch_test(test/test_basalt_vio_lifecycle.py TIMEOUT 30)
+  add_launch_test(test/test_vio_rosbag_replay.py TIMEOUT 90)
+  ament_add_pytest_test(test_vio_test_bag test/test_vio_test_bag.py TIMEOUT 30)
 endif()
 
 ament_export_targets(export_mower_localization HAS_LIBRARY_TARGET)

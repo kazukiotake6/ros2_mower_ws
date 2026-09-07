@@ -38,7 +38,8 @@ public:
   CallbackReturn on_error(const rclcpp_lifecycle::State &) override;
 
 private:
-  void record_input();
+  void record_image_input();
+  void record_imu_input();
   void check_input_timeout();
   void on_imu(const sensor_msgs::msg::Imu & message);
   void on_image(const sensor_msgs::msg::Image & message);
@@ -52,7 +53,8 @@ private:
   std::unique_ptr<VioInputValidator> validator_;
   std::optional<sensor_msgs::msg::CameraInfo> camera_info_;
   rclcpp::TimerBase::SharedPtr timeout_timer_;
-  std::chrono::steady_clock::time_point last_input_time_{};
+  std::chrono::steady_clock::time_point last_image_time_{};
+  std::chrono::steady_clock::time_point last_imu_time_{};
   bool input_timed_out_{false};
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_subscription_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_subscription_;
