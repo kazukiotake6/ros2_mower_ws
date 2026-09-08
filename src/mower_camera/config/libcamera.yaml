@@ -10,3 +10,13 @@ libcamera_node:
     # 0 uses libcamera auto-exposure and auto-gain.
     exposure_time_us: 0
     analogue_gain: 0.0
+    diagnostic_period_s: 1.0
+    # Negative thresholds disable severity evaluation until values are agreed.
+    diagnostic_minimum_fps_warn: -1.0
+    diagnostic_minimum_fps_error: -1.0
+    diagnostic_maximum_queue_latency_ms_warn: -1.0
+    diagnostic_maximum_queue_latency_ms_error: -1.0
+    diagnostic_missing_frames_warn: -1
+    diagnostic_missing_frames_error: -1
+    diagnostic_request_failures_warn: -1
+    diagnostic_request_failures_error: -1

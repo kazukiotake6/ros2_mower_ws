@@ -15,14 +15,19 @@ ament_target_dependencies(camera_parameters sensor_msgs)
 target_compile_features(camera_parameters PUBLIC cxx_std_17)
 target_compile_options(camera_parameters PRIVATE -Wall -Wextra -Wpedantic)
 
+add_library(camera_diagnostics src/camera_diagnostics.cpp)
+target_include_directories(camera_diagnostics PUBLIC include)
+target_compile_features(camera_diagnostics PUBLIC cxx_std_17)
+target_compile_options(camera_diagnostics PRIVATE -Wall -Wextra -Wpedantic)
+
 add_executable(libcamera_node src/libcamera_node.cpp)
-target_link_libraries(libcamera_node camera_parameters PkgConfig::LIBCAMERA)
+target_link_libraries(libcamera_node camera_parameters camera_diagnostics PkgConfig::LIBCAMERA)
 target_include_directories(libcamera_node PRIVATE include)
 ament_target_dependencies(libcamera_node camera_info_manager diagnostic_msgs rclcpp sensor_msgs)
 target_compile_features(libcamera_node PUBLIC cxx_std_17)
 target_compile_options(libcamera_node PRIVATE -Wall -Wextra -Wpedantic)
 
-install(TARGETS camera_parameters libcamera_node
+install(TARGETS camera_parameters camera_diagnostics libcamera_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME})
@@ -37,6 +42,9 @@ if(BUILD_TESTING)
   target_link_libraries(test_camera_parameters camera_parameters)
   target_include_directories(test_camera_parameters PRIVATE include)
   ament_target_dependencies(test_camera_parameters sensor_msgs)
+  ament_add_gtest(test_camera_diagnostics test/test_camera_diagnostics.cpp)
+  target_link_libraries(test_camera_diagnostics camera_diagnostics)
+  target_include_directories(test_camera_diagnostics PRIVATE include)
 endif()
 
 ament_package()

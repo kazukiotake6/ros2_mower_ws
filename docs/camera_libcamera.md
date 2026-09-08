@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | `/image_raw` | `sensor_msgs/msg/Image` | キャプチャ画像。Sensor Data QoSで配信する。 |
 | `/camera_info` | `sensor_msgs/msg/CameraInfo` | `camera_info_url` の較正値と、実際に設定された画像サイズを配信する。 |
-| `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | 起動成功時に `mower_camera/libcamera` の状態を配信する。 |
+| `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | `mower_camera/libcamera`の起動状態と、周期的な配信統計を通知する。 |
 
 `frame_id` の既定値は `camera_optical_frame` です。画像ヘッダの時刻はROSクロックのPublish時刻です。libcameraの単調クロックをROS時刻としてそのまま使わないため、Camera-IMU同期を評価する際はフレーム開始とBMI270 IRQをハードウェアで同時計測します。
 
@@ -29,6 +29,17 @@
 | `camera_info_url` | `string`, `""` | camera_info_manager互換の較正YAML URL。 |
 | `exposure_time_us` | `int`, `0` | 0なら自動露光。正数なら露光時間を固定する。 |
 | `analogue_gain` | `double`, `0.0` | 0なら自動ゲイン。正数ならアナログゲインを固定する。 |
+| `diagnostic_period_s` | `double`, `1.0` | diagnostics集計・配信周期。正の有限値が必要。 |
+| `diagnostic_minimum_fps_warn/error` | `double`, `-1.0` | 実効FPSのWARN/ERROR下限。負数は判定無効。 |
+| `diagnostic_maximum_queue_latency_ms_warn/error` | `double`, `-1.0` | フレーム取得からcallbackまでの最大遅延閾値。負数は判定無効。 |
+| `diagnostic_missing_frames_warn/error` | `int`, `-1` | 集計周期内の欠落フレーム数閾値。負数は判定無効。 |
+| `diagnostic_request_failures_warn/error` | `int`, `-1` | 集計周期内のrequest失敗数閾値。負数は判定無効。 |
+
+周期診断には`frames`、`effective_fps`、`missing_frames`、
+`maximum_queue_latency_ms`、`request_failures`、`reinitializations`、
+`timestamp_regressions`を含める。実効FPS、遅延、欠落、request失敗の
+WARN/ERROR判定は、対象機と負荷条件について合意した値を明示的に設定した場合だけ行う。
+カメラ取得時刻の重複または逆行は、時刻同期入力として正常扱いしないため常にERRORとする。
 
 要求値をカメラが対応しない場合、libcameraは設定を調整または拒否します。起動後は実際の`/image_raw`と`/camera_info`を必ず確認し、その解像度で較正します。
 
