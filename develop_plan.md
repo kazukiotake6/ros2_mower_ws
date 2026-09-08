@@ -448,6 +448,12 @@ libcamera request処理から統計集計を分離し、実効FPS、連続フレ
 
 完了条件は、正常列、欠落、遅延、異常metadata、カウンタのリセット・飽和を決定論的に検証でき、実機ノードが同じ集計結果を`/diagnostics`へ反映できることである。実FPSとフレーム開始時刻の確認は実機試験に残す。
 
+進捗（2026-09-08）：libcamera非依存の集計クラスを追加し、実効FPS、連番欠落、
+最大キュー遅延、request失敗、再初期化、時刻逆行を周期診断へ反映した。
+WARN/ERROR閾値は負数で無効とし、合意済み値をパラメータで明示した場合だけ判定する。
+正常列、欠落、遅延、時刻逆行、window reset、カウンタ飽和を単体試験する。
+実FPSとlibcamera metadata時刻の実機整合は後続のPi 5試験に残す。
+
 ### 15.5 CAN仕様承認後の仮想CAN試験
 
 CAN codec、gatewayおよびMCU simulatorは、`docs/interfaces/can-protocol.md`のID、DLC、配置、単位、version、連番、CRC、周期、timeoutが承認された後に実装する。承認前はインターフェース骨格と試験観点の整備に留め、暫定値を実車送信可能な設定として実装しない。
